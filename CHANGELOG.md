@@ -1,0 +1,29 @@
+# Changelog
+
+All notable changes to this project are documented here. The format is based on
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
+to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [0.1.0] - 2026-10-01
+
+### Added
+
+- Coverage-first search engine: keyless sources (Bluesky, Hacker News, GitHub,
+  arXiv, Polymarket, StockTwits, Mastodon, Habr, V2EX, Telegram, Sogou WeChat),
+  a window-bisecting gap-closing driver, per-source near-duplicate dedup, and
+  relevance ranking with head-entity grounding, CJK segmentation, a recency boost,
+  and engagement weighting.
+- Walled-platform access (Twitter/X, Reddit, Instagram, Facebook, Bilibili,
+  Xiaohongshu) through the user's logged-in Chromium browser via OpenCLI, with
+  runtime adapter discovery.
+- MCP server exposing `deep_search`, `resume`, `list_sessions`, `cleanup`,
+  `doctor`, `status`, and `fetch`, all context-lean.
+- Session storage under `~/.net-sift/sessions/` with keep-or-delete confirmation.
+- `net-sift` CLI: `install`, `serve`, `doctor`, `status`, `search`.
+- Installer that registers the MCP server and status bar for Claude Code and Codex.
+- Test suite, Ruff linting, and GitHub Actions CI.
+
+[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.1.0

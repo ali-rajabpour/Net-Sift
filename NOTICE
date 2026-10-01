@@ -1,0 +1,14 @@
+Net-Sift
+Copyright (c) 2026 Ali Rajabpour
+
+This product includes code adapted from Agent Reach
+(https://github.com/Panniantong/Agent-Reach), licensed under the MIT License,
+Copyright (c) Panniantong.
+
+Portions adapted from Agent Reach:
+  - net_sift/access/opencli.py        (OpenCLI real-browser backend probing)
+  - net_sift/doctor.py                (source health-check scaffolding)
+  - net_sift/guides/*.md              (per-platform setup guides)
+
+OpenCLI itself (https://github.com/jackwener/opencli) is a separate project by
+its own authors and is invoked as an external tool, not vendored here.

@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# net-sift runtime: search sessions are user data, never committed
+.net-sift/
+sessions/
+
+# local env / secrets
+.env
+.env.*
+!.env.example
+
+# session handoffs (local memory, never committed)
+.claude/handoffs/
+
+# OS
+.DS_Store
