@@ -6,6 +6,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-04
+
+### Changed
+
+- The status bar line is now informative: `net-sift ● 7 social + 11 web sources
+  ready`, or `net-sift ○ browser not connected · 11 web sources ready`, instead of
+  the bare `net-sift 11+7`.
+
 ## [0.5.0] - 2026-10-03
 
 ### Added
@@ -122,7 +130,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Installer that registers the MCP server and status bar for Claude Code and Codex.
 - Test suite, Ruff linting, and GitHub Actions CI.
 
-[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.5.1
 [0.5.0]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.5.0
 [0.4.2]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.4.2
 [0.4.1]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.4.1

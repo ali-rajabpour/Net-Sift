@@ -23,9 +23,13 @@ def snapshot() -> dict:
 
 
 def line() -> str:
-    """Compact one-segment status, sized to sit next to other status items.
-    Example: `net-sift ●11+7` (11 keyless sources, 7 connected accounts)."""
+    """One informative status line. net-sift gets its own line (the installer adds
+    it below your existing bar), so it can spell things out.
+    Examples:
+      net-sift ● 7 social + 11 web sources ready
+      net-sift ○ browser not connected · 11 web sources ready
+    """
     s = snapshot()
-    dot = "●" if s["opencli"] else "○"  # filled when a browser is connected
-    acc = f"+{len(s['walled'])}" if s["walled"] else ""
-    return f"net-sift {dot}{s['keyless_count']}{acc}"
+    if s["opencli"]:
+        return f"net-sift ● {len(s['walled'])} social + {s['keyless_count']} web sources ready"
+    return f"net-sift ○ browser not connected · {s['keyless_count']} web sources ready"
