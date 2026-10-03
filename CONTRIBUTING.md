@@ -2,6 +2,21 @@
 
 Thanks for your interest in Net-Sift.
 
+## Contribution policy (CLA + sign-off)
+
+By opening a pull request you agree to the [Contributor License Agreement](CLA.md):
+you keep your copyright and authorship, and you grant the maintainer a license to
+use and relicense your contribution so the project's licensing stays coherent.
+
+Every commit must be signed off, which certifies the Developer Certificate of
+Origin. Use `git commit -s` to add the line:
+
+```
+Signed-off-by: Your Name <your@email>
+```
+
+CI checks that commits in a pull request are signed off.
+
 ## Development setup
 
 ```bash
