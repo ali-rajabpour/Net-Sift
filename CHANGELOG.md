@@ -6,6 +6,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-04
+
+### Security
+
+- `secrets.json` is created with 0600 permissions from the start (os.open), so a
+  saved key is never briefly world-readable.
+- The `fetch` tool refuses private, loopback, link-local, and reserved addresses
+  (SSRF guard) and marks returned page content as untrusted.
+- `instagram_recon` clamps the per-call billed-request cap to 1000 so a caller
+  cannot spend without bound.
+
 ## [0.6.0] - 2026-10-04
 
 ### Added
@@ -151,7 +162,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Installer that registers the MCP server and status bar for Claude Code and Codex.
 - Test suite, Ruff linting, and GitHub Actions CI.
 
-[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.6.1
 [0.6.0]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.6.0
 [0.5.1]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.5.1
 [0.5.0]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.5.0

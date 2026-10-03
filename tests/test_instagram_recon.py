@@ -28,6 +28,13 @@ def test_run_unknown_op(monkeypatch):
     assert "unknown op" in out["error"]
 
 
+def test_max_requests_clamped(monkeypatch):
+    monkeypatch.setattr(config, "get_secret", lambda name: "k")
+    monkeypatch.setitem(ig.OPS, "probe", (lambda b, key, handle, **kw: {"cap": b.cap}, 1))
+    out = ig.run("probe", "@x", max_requests=999999)
+    assert out["cap"] == ig.MAX_REQUESTS_CEILING
+
+
 def test_budget_caps(monkeypatch):
     b = ig.Budget(1)
     monkeypatch.setattr(ig, "_json", lambda url, headers: {"ok": True})

@@ -15,6 +15,7 @@ from . import config
 from .engine.core import _json
 
 HIKER = "https://api.hikerapi.com"
+MAX_REQUESTS_CEILING = 1000  # hard upper bound on billed requests per call
 
 
 class RequestCapReached(RuntimeError):
@@ -275,6 +276,8 @@ def run(
         key = _key()
     except RuntimeError as e:
         return {"error": str(e)}
+    # Clamp the per-call billed-request cap so a caller cannot spend without bound.
+    max_requests = max(1, min(int(max_requests), MAX_REQUESTS_CEILING))
     fn, _rough = OPS[op]
     b = Budget(max_requests)
     try:

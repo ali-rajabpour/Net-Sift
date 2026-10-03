@@ -43,15 +43,15 @@ def get_secret(name: str) -> str | None:
 
 
 def set_secret(name: str, value: str) -> None:
-    """Persist a provider key to ~/.net-sift/secrets.json with 0600 perms."""
+    """Persist a provider key to ~/.net-sift/secrets.json. The file is created with
+    0600 from the start (os.open), so the key is never briefly world-readable."""
     HOME.mkdir(parents=True, exist_ok=True)
     try:
         data = json.loads(_SECRETS.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         data = {}
     data[name] = value
-    _SECRETS.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    try:
-        _SECRETS.chmod(stat.S_IRUSR | stat.S_IWUSR)  # 0600
-    except OSError:
-        pass
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    fd = os.open(_SECRETS, flags, stat.S_IRUSR | stat.S_IWUSR)  # 0600 at creation
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
