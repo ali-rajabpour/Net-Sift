@@ -1,11 +1,14 @@
-# Net-Sift
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ali-rajabpour/Net-Sift/main/docs/assets/banner.png" alt="Net-Sift" width="100%">
+</p>
 
-Coverage-first social and web deep-search, delivered as an MCP server.
-
-[![CI](https://github.com/ali-rajabpour/Net-Sift/actions/workflows/ci.yml/badge.svg)](https://github.com/ali-rajabpour/Net-Sift/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-green.svg)](https://www.python.org/)
-[![Linting: Ruff](https://img.shields.io/badge/lint-ruff-261230.svg)](https://github.com/astral-sh/ruff)
+<p align="center">
+  <a href="https://github.com/ali-rajabpour/Net-Sift/actions/workflows/ci.yml"><img src="https://github.com/ali-rajabpour/Net-Sift/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://pypi.org/project/net-sift/"><img src="https://img.shields.io/pypi/v/net-sift.svg" alt="PyPI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPL%20v3-blue.svg" alt="License: AGPL v3"></a>
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.10%2B-green.svg" alt="Python 3.10+"></a>
+  <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/lint-ruff-261230.svg" alt="Linting: Ruff"></a>
+</p>
 
 Net-Sift sweeps many sources for everything being said about a topic, ranks it,
 removes duplicates, and reports what it could not reach. The gap report is part of
@@ -185,8 +188,11 @@ See [SECURITY.md](SECURITY.md). Report vulnerabilities privately through GitHub.
 
 ## License
 
-MIT. See [LICENSE](LICENSE). This project includes code adapted from
-[Agent Reach](https://github.com/Panniantong/Agent-Reach) (MIT); see [NOTICE](NOTICE).
+GNU AGPL-3.0-or-later. See [LICENSE](LICENSE). If you run a modified version as a
+network service, the AGPL requires you to offer users its source. This project
+includes code adapted from [Agent Reach](https://github.com/Panniantong/Agent-Reach)
+(MIT, a permissive license compatible with AGPL); that attribution is kept in
+[NOTICE](NOTICE).
 
 ## Acknowledgements
 
