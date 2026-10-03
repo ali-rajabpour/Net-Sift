@@ -6,6 +6,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-03
+
+### Changed
+
+- `net-sift install` is now a guided wizard. It registers with the clients it
+  detects, installs OpenCLI automatically through npm (with consent), and walks the
+  user through connecting a Chromium browser, rechecking as it goes. Each step asks
+  before acting and reports exactly what is needed on failure instead of leaving a
+  bare warning. Add `--yes` for an unattended run.
+
 ## [0.1.0] - 2026-10-01
 
 ### Added
@@ -25,5 +35,6 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Installer that registers the MCP server and status bar for Claude Code and Codex.
 - Test suite, Ruff linting, and GitHub Actions CI.
 
-[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.2.0
 [0.1.0]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.1.0

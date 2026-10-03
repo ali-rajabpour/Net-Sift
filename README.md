@@ -85,14 +85,16 @@ uv tool install git+https://github.com/ali-rajabpour/Net-Sift.git
 # or: pipx install git+https://github.com/ali-rajabpour/Net-Sift.git
 ```
 
-Then register it with your clients:
+Then run the setup wizard:
 
 ```bash
-net-sift install              # register the MCP + status bar, check deps, run doctor
+net-sift install              # guided: clients, OpenCLI, browser; add --yes for unattended
 ```
 
-`net-sift install` registers the MCP server and a status bar with Claude Code and
-Codex, checks for Node and OpenCLI, and runs the doctor. Restart your client
+`net-sift install` is a wizard. It registers the MCP server and status bar with the
+clients it finds (Claude Code, Codex), installs OpenCLI automatically through npm
+with your consent, and walks you through connecting a Chromium browser, rechecking
+as it goes. Each step asks before it changes anything. Restart your client
 afterward so it picks up the server.
 
 ## Quickstart
