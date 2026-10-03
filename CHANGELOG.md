@@ -6,6 +6,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-10-04
+
+### Removed
+
+- The generic `fetch` MCP tool. Making an arbitrary-URL fetcher fully SSRF-safe
+  (redirect bypass, DNS-rebinding TOCTOU, unbounded reads) is not worth the attack
+  surface for a search-first tool; use your client's own web fetch instead. This
+  removes that entire class of findings.
+
+### Fixed
+
+- `secrets.json` permissions are re-applied to 0600 even when the file already
+  existed with looser bits.
+
 ## [0.6.1] - 2026-10-04
 
 ### Security
@@ -162,7 +176,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Installer that registers the MCP server and status bar for Claude Code and Codex.
 - Test suite, Ruff linting, and GitHub Actions CI.
 
-[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.6.2
 [0.6.1]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.6.1
 [0.6.0]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.6.0
 [0.5.1]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.5.1

@@ -28,13 +28,3 @@ def test_secret_file_is_0600(tmp_path, monkeypatch):
     config.set_secret("HIKERAPI_KEY", "x")
     mode = _stat.S_IMODE((tmp_path / "secrets.json").stat().st_mode)
     assert mode == 0o600
-
-
-def test_fetch_ssrf_guard():
-    from net_sift import mcp_server as m
-
-    assert m._public_http_url("http://127.0.0.1/") is not None
-    assert m._public_http_url("http://169.254.169.254/latest/meta-data") is not None
-    assert m._public_http_url("http://10.0.0.5/") is not None
-    assert m._public_http_url("file:///etc/passwd") is not None
-    assert m._public_http_url("http://8.8.8.8/") is None  # public IP ok

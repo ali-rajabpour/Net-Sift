@@ -55,3 +55,9 @@ def set_secret(name: str, value: str) -> None:
     fd = os.open(_SECRETS, flags, stat.S_IRUSR | stat.S_IWUSR)  # 0600 at creation
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
+    # Correct perms even if the file pre-existed with looser bits (O_CREAT mode
+    # only applies on creation).
+    try:
+        os.chmod(_SECRETS, stat.S_IRUSR | stat.S_IWUSR)
+    except OSError:
+        pass

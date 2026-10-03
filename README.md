@@ -145,7 +145,6 @@ sources are on by default; walled sources appear once OpenCLI is connected.
 | `cleanup` | delete a saved search (after user confirmation) |
 | `doctor` | what is reachable and how to connect walled platforms |
 | `status` | compact connectivity snapshot |
-| `fetch` | readable text for one page |
 | `darkweb_search` | read-only, information-only Tor onion-forum discussion search (opt-in, needs Tor) |
 | `instagram_recon` | per-account Instagram analysis via HikerAPI (opt-in, metered, needs a key) |
 
