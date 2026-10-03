@@ -285,8 +285,18 @@ def _connect_accounts(ui: _UI) -> None:
     for site in opencli.WALLED_SITES:
         name, url = opencli.WALLED_META[site]
         ui.info(f"Checking {name}...")
-        if opencli.probe_login(site):
+        ok, reason = opencli.probe_detail(site)
+        if ok:
             ui.ok(f"{name}: connected")
+            continue
+        if reason == "blocked":
+            # OpenCLI cannot open the site at all. Not a login problem, so do not
+            # loop asking the user to sign in.
+            ui.warn(
+                f"{name}: OpenCLI cannot open this site right now (the platform is "
+                "blocking automation, or its OpenCLI adapter is down). Not a login issue."
+            )
+            ui.info(f"{name}: skipped")
             continue
         if not ui.confirm(f"{name} is not connected. Connect it now?", default=True):
             ui.info(f"{name}: skipped")
@@ -294,17 +304,21 @@ def _connect_accounts(ui: _UI) -> None:
         ui.info(f"Log into {name}: opening {url}")
         ui.info("Sign in as normal in that browser, then come back here.")
         _open_url(url)
-        while True:
-            if not ui.pause(f"Press Enter once you are logged into {name}"):
-                ui.info(f"{name}: skipped")
-                break
-            ui.info("Verifying...")
-            if opencli.probe_login(site):
-                ui.ok(f"{name}: connected")
-                break
-            if not ui.confirm(f"{name} still not working. Try again?", default=False):
-                ui.info(f"{name}: skipped")
-                break
+        # One login attempt, then move on. No infinite retry loop.
+        if not ui.pause(f"Press Enter once you are logged into {name}"):
+            ui.info(f"{name}: skipped")
+            continue
+        ui.info("Verifying...")
+        ok2, reason2 = opencli.probe_detail(site)
+        if ok2:
+            ui.ok(f"{name}: connected")
+        elif reason2 == "blocked":
+            ui.warn(
+                f"{name}: still cannot be opened by OpenCLI. This is a platform/adapter "
+                "block, not your login. Skipping."
+            )
+        else:
+            ui.warn(f"{name}: still not reachable. Skipping; rerun net-sift install to retry.")
 
 
 def run(home: Path | None = None, assume_yes: bool = False) -> int:

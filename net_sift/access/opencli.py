@@ -348,13 +348,17 @@ def make_source(site: str, command: str):
     return source
 
 
-def probe_login(site: str, timeout: int = 60) -> bool:
-    """True when a real search on `site` works right now, which means the browser is
-    logged into it. Runs `opencli <site> search ... -f json`; a not-logged-in or
-    blocked platform returns an error object (`ok: false`) or a nonzero exit."""
+def probe_detail(site: str, timeout: int = 60) -> tuple[bool, str]:
+    """Probe a platform with a real search. Returns (connected, reason):
+    ("ok", True)         - search worked, so the browser is logged in and usable
+    (False, "blocked")   - OpenCLI could not open the site (anti-automation block
+                           or a broken adapter); logging in will NOT fix this
+    (False, "login")     - reachable but the search failed; a login may help
+    (False, "no-opencli")/("error") - opencli missing or an unexpected failure
+    """
     exe = binary()
     if not exe:
-        return False
+        return False, "no-opencli"
     try:
         p = subprocess.run(
             [exe, site, "search", "news", "--limit", "1", "-f", "json"],
@@ -363,16 +367,25 @@ def probe_login(site: str, timeout: int = 60) -> bool:
             timeout=timeout,
         )
     except (OSError, subprocess.SubprocessError):
-        return False
+        return False, "error"
+    blob = (p.stdout or "") + (p.stderr or "")
+    if "navigation rejected" in blob.lower():
+        return False, "blocked"
     if p.returncode != 0 or not p.stdout.strip():
-        return False
+        return False, "login"
     try:
         d = json.loads(p.stdout)
     except ValueError:
-        return False
+        return False, "error"
     if isinstance(d, dict) and d.get("ok") is False:
-        return False
-    return True
+        msg = str((d.get("error") or {}).get("message", "")).lower()
+        return False, ("blocked" if "navigation rejected" in msg else "login")
+    return True, "ok"
+
+
+def probe_login(site: str, timeout: int = 60) -> bool:
+    """True when a real search on `site` works, i.e. the browser is logged into it."""
+    return probe_detail(site, timeout=timeout)[0]
 
 
 def walled_sources(connected: bool | None = None) -> dict[str, object]:

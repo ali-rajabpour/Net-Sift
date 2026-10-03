@@ -6,6 +6,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-10-03
+
+### Fixed
+
+- The account check no longer loops asking you to log in when the real problem is
+  that OpenCLI cannot open a site at all (a "Navigation rejected" block, seen on
+  Facebook even while logged in). The probe now classifies the result: connected,
+  blocked (platform/adapter block, not a login issue, reported and skipped), or a
+  genuine login failure (one login attempt, then move on). No more infinite retry.
+
 ## [0.4.1] - 2026-10-03
 
 ### Fixed
@@ -91,7 +101,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Installer that registers the MCP server and status bar for Claude Code and Codex.
 - Test suite, Ruff linting, and GitHub Actions CI.
 
-[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.4.2
 [0.4.1]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.4.1
 [0.4.0]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.4.0
 [0.3.2]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.3.2

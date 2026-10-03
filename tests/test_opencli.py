@@ -91,6 +91,27 @@ def test_probe_login_no_binary(monkeypatch):
     assert opencli.probe_login("reddit") is False
 
 
+def test_probe_detail_classifies(monkeypatch):
+    monkeypatch.setattr(opencli, "binary", lambda: "/usr/bin/opencli")
+    # success
+    monkeypatch.setattr(opencli.subprocess, "run", lambda *a, **k: _Proc(0, '[{"id": 1}]'))
+    assert opencli.probe_detail("reddit") == (True, "ok")
+    # facebook-style navigation block (ok:false with that message)
+    blocked = _Proc(
+        1,
+        '{"ok": false, "error": {"message": "Failed to open facebook search: Navigation rejected."}}',
+    )
+    monkeypatch.setattr(opencli.subprocess, "run", lambda *a, **k: blocked)
+    assert opencli.probe_detail("facebook") == (False, "blocked")
+    # reachable but search failed, no navigation phrase -> login
+    monkeypatch.setattr(
+        opencli.subprocess,
+        "run",
+        lambda *a, **k: _Proc(0, '{"ok": false, "error": {"message": "not signed in"}}'),
+    )
+    assert opencli.probe_detail("twitter") == (False, "login")
+
+
 def test_parse_connected():
     doc = "[OK] Extension: connected (v1.0.24)\n[OK] Connectivity: connected in 4.6s"
     assert opencli._parse_connected(doc) is True
