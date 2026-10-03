@@ -12,7 +12,9 @@ import re
 from mcp.server.mcpserver import MCPServer
 
 from . import config, sessions
+from . import darkweb as darkweb_mod
 from . import doctor as doctor_mod
+from . import instagram_recon as ig_mod
 from . import search as search_mod
 from . import status as status_mod
 from .engine import core
@@ -99,6 +101,61 @@ def fetch(url: str, max_chars: int = 6000) -> dict:
     text = re.sub(r"(?s)<[^>]+>", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
     return {"url": url, "truncated": len(text) > max_chars, "text": text[:max_chars]}
+
+
+@mcp.tool()
+def darkweb_search(query: str, fetch: int = 0) -> dict:
+    """Read-only, information-only discussion search across Tor onion forums.
+
+    Discovers onion forums via onion search indexes and returns public discussion
+    text. A non-optional filter drops anything signalling markets, credentials,
+    drugs, weapons, or abuse. Needs `tor` installed; it starts and stops its own
+    ephemeral Tor. fetch=N also reads the top N forum pages (slower). Returns a
+    summary and the on-disk corpus path.
+    """
+    try:
+        records, logs = darkweb_mod.darkweb(query, fetch=fetch)
+    except RuntimeError as e:
+        return {"error": str(e)}
+    meta = sessions.save(query, {"source": "darkweb", "fetch": fetch}, records, logs)
+    return {
+        "session_id": meta["id"],
+        "query": query,
+        "total_records": meta["count"],
+        "log": logs,
+        "top": [{"url": r.get("url"), "text": (r.get("text") or "")[:200]} for r in records[:10]],
+        "corpus_path": meta["corpus"],
+        "note": "information-only; markets/credentials/illegal categories are filtered out",
+        "reminder": f"Corpus kept at {meta['corpus']}. Delete with cleanup('{meta['id']}').",
+    }
+
+
+@mcp.tool()
+def instagram_recon(
+    op: str,
+    handle: str,
+    other: str | None = None,
+    posts: int = 36,
+    per_post: int = 20,
+    limit: int = 200,
+    max_requests: int = 100,
+) -> dict:
+    """Per-account Instagram analysis via HikerAPI (opt-in, billed per request).
+
+    op: profile | timeline | where | fans | followers | intersect. `handle` is the
+    account (@name); `other` is the second account for intersect. Needs a HikerAPI
+    key (set during `net-sift install`, or env HIKERAPI_KEY). Every op is capped at
+    `max_requests` billed requests. Returns the analysis and the billed count.
+    """
+    return ig_mod.run(
+        op,
+        handle,
+        other=other,
+        posts=posts,
+        per_post=per_post,
+        limit=limit,
+        max_requests=max_requests,
+    )
 
 
 def main() -> None:

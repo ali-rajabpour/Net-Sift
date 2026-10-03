@@ -23,13 +23,16 @@ def snapshot() -> dict:
 
 
 def line() -> str:
-    """One informative status line. net-sift gets its own line (the installer adds
-    it below your existing bar), so it can spell things out.
+    """One informative status line with a colored [NET-SIFT] badge. net-sift gets
+    its own line (the installer adds it below your existing bar).
+    Blue badge when a browser is connected, red when not.
     Examples:
-      net-sift ● 7 social + 11 web sources ready
-      net-sift ○ browser not connected · 11 web sources ready
+      [NET-SIFT] 7 social + 11 web sources ready
+      [NET-SIFT] browser not connected · 11 web sources ready
     """
     s = snapshot()
+    color = 33 if s["opencli"] else 196  # blue when connected, red when not
+    badge = f"\033[1;38;5;{color}m[NET-SIFT]\033[0m"
     if s["opencli"]:
-        return f"net-sift ● {len(s['walled'])} social + {s['keyless_count']} web sources ready"
-    return f"net-sift ○ browser not connected · {s['keyless_count']} web sources ready"
+        return f"{badge} {len(s['walled'])} social + {s['keyless_count']} web sources ready"
+    return f"{badge} browser not connected · {s['keyless_count']} web sources ready"

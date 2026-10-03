@@ -6,6 +6,27 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-04
+
+### Added
+
+- Dark-web discussion search (`darkweb_search` MCP tool): read-only,
+  information-only search across Tor onion forums, with a non-optional content
+  filter (markets, credentials, drugs, weapons, abuse are dropped) and a
+  self-managed ephemeral Tor that is started and verifiably torn down per call.
+  Opt-in; needs `tor` installed.
+- Instagram account recon (`instagram_recon` MCP tool): profile, timeline, where,
+  fans, followers, intersect via HikerAPI, each capped at a per-request budget.
+  Opt-in; the key is set during `net-sift install` (or env `HIKERAPI_KEY`) and
+  saved to `~/.net-sift/secrets.json` with 0600 permissions.
+- Wizard "Optional features" step offering Tor install and a HikerAPI key.
+- `net-sift doctor` reports dark-web (Tor) and Instagram-recon (key) availability.
+
+### Changed
+
+- The status bar badge is now a colored `[NET-SIFT]` (blue when a browser is
+  connected, red when not).
+
 ## [0.5.1] - 2026-10-04
 
 ### Changed
@@ -130,7 +151,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Installer that registers the MCP server and status bar for Claude Code and Codex.
 - Test suite, Ruff linting, and GitHub Actions CI.
 
-[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.6.0
 [0.5.1]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.5.1
 [0.5.0]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.5.0
 [0.4.2]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.4.2

@@ -304,6 +304,17 @@ class _UI:
             if ans.isdigit() and 1 <= int(ans) <= len(options):
                 return int(ans) - 1
 
+    def secret(self, msg: str) -> str:
+        """Read a secret without echoing it. Empty/unattended returns ''."""
+        if self.assume_yes:
+            return ""
+        import getpass
+
+        try:
+            return getpass.getpass(f"  {msg}: ").strip()
+        except (EOFError, Exception):
+            return ""
+
 
 def _run(cmd: list[str], timeout: int = 300) -> tuple[int, str]:
     try:
@@ -502,6 +513,41 @@ def _connect_accounts(ui: _UI, browser: dict | None) -> None:
                 break
 
 
+def _optional_features(ui: _UI) -> None:
+    """Opt-in extras: Tor onion search, and Instagram account recon (needs a key)."""
+    ui.step("Optional features")
+
+    # Darkweb (Tor onion discussion search, information-only)
+    if shutil.which("tor"):
+        ui.ok("Tor found: dark-web discussion search is available (information-only).")
+    else:
+        ui.info("Dark-web discussion search (information-only) needs Tor. It is optional.")
+        brew = shutil.which("brew")
+        if brew and ui.confirm("Install Tor with Homebrew now?", default=False):
+            code, out = _run([brew, "install", "tor"], timeout=1800)
+            ui.ok("Tor installed.") if code == 0 else ui.warn(
+                "Could not install Tor; skip for now."
+            )
+        else:
+            ui.info("Install later with `brew install tor` (macOS) or your package manager.")
+
+    # Instagram account recon (HikerAPI, metered)
+    from . import config
+    from . import instagram_recon as ig
+
+    if ig.key_present():
+        ui.ok("Instagram account recon: key already set.")
+    elif ui.confirm(
+        "Enable Instagram account recon? It needs a paid HikerAPI access key.", default=False
+    ):
+        k = ui.secret("Paste your HikerAPI access key (hidden)")
+        if k:
+            config.set_secret("HIKERAPI_KEY", k)
+            ui.ok("Saved. Instagram account recon is enabled.")
+        else:
+            ui.info("No key entered; skipped. Rerun net-sift install to add it later.")
+
+
 def run(home: Path | None = None, assume_yes: bool = False) -> int:
     home = home or Path.home()
     ui = _UI(assume_yes)
@@ -512,6 +558,7 @@ def run(home: Path | None = None, assume_yes: bool = False) -> int:
         browser = _choose_browser(ui, home)
         if _connect_bridge(ui, browser):
             _connect_accounts(ui, browser)
+    _optional_features(ui)
 
     ui.step("Done")
     ui.info("net-sift is installed. Keyless sources (Bluesky, Hacker News, GitHub, arXiv,")

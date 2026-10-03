@@ -12,6 +12,8 @@ import shutil
 from datetime import datetime, timedelta, timezone
 
 from . import config
+from . import darkweb as darkweb_mod
+from . import instagram_recon as ig_mod
 from .access import opencli
 from .engine import sources
 
@@ -35,6 +37,12 @@ def report(probe: bool = False) -> dict:
             k: ("set" if os.environ.get(k) else "unset") + f" ({desc})"
             for k, desc in config.OPTIONAL_ENV.items()
         },
+        "darkweb": "tor found (available)"
+        if darkweb_mod.tor_available()
+        else "tor not installed (optional; `brew install tor`)",
+        "instagram_recon": "key set (available)"
+        if ig_mod.key_present()
+        else "no key (optional; run `net-sift install` to add a HikerAPI key)",
     }
     if probe:
         data["keyless_reachable"] = _probe_keyless()
@@ -96,6 +104,8 @@ def render(probe: bool = False) -> str:
     lines.append(f"node     : {d['node']}")
     lines.append(f"accounts : {', '.join(d['walled_available']) or 'none connected'}")
     lines.append(f"keyless  : {', '.join(d['keyless_sources'])}")
+    lines.append(f"darkweb  : {d['darkweb']}")
+    lines.append(f"ig recon : {d['instagram_recon']}")
     lines.append("env     :")
     for k, v in d["optional_env"].items():
         lines.append(f"  {k}: {v}")
