@@ -75,29 +75,27 @@ def _probe_keyless() -> dict:
 def _guidance(connected: bool, walled: dict) -> str:
     if connected and walled:
         return (
-            f"Walled platforms reachable via OpenCLI: {', '.join(sorted(walled))}. "
-            "Each one still needs you logged into it in that browser; login is verified "
-            "when you search it."
+            "Browser connected. Accounts you are logged into are searchable; run "
+            "`net-sift install` to check each account and log into any you want to add."
         )
     if not opencli.binary():
         return (
-            "No walled platform reachable. Install OpenCLI (npm i -g @jackwener/opencli "
-            "or the OpenCLIApp), open a Chromium browser with the OpenCLI extension, and log "
-            "into the platforms you want (X, Reddit, Instagram, Facebook, Bilibili, Xiaohongshu)."
+            "Account search is off. Install OpenCLI (npm i -g @jackwener/opencli or the "
+            "OpenCLIApp), then run `net-sift install` to connect your browser and accounts."
         )
     return (
-        "OpenCLI is installed but no browser session is connected. Open a Chromium browser "
-        "with the OpenCLI extension enabled and log into the platforms you want."
+        "Browser not connected. Open a Chromium browser with the OpenCLI extension enabled, "
+        "then run `net-sift install` to connect your accounts."
     )
 
 
 def render(probe: bool = False) -> str:
     d = report(probe=probe)
     lines = ["net-sift doctor", "=" * 40]
-    lines.append(f"opencli : {d['opencli']}")
-    lines.append(f"node    : {d['node']}")
-    lines.append(f"walled  : {', '.join(d['walled_available']) or 'none connected'}")
-    lines.append(f"keyless : {', '.join(d['keyless_sources'])}")
+    lines.append(f"opencli  : {d['opencli']}")
+    lines.append(f"node     : {d['node']}")
+    lines.append(f"accounts : {', '.join(d['walled_available']) or 'none connected'}")
+    lines.append(f"keyless  : {', '.join(d['keyless_sources'])}")
     lines.append("env     :")
     for k, v in d["optional_env"].items():
         lines.append(f"  {k}: {v}")

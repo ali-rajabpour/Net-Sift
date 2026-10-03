@@ -6,6 +6,22 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-03
+
+### Changed
+
+- The install wizard now checks each social account one by one in plain language
+  instead of printing "walled platforms". For every account (X, Reddit, Instagram,
+  Facebook, Bilibili, Xiaohongshu, Zhihu) it verifies a real search works; if an
+  account is not connected it asks whether to connect it, opens the login page with
+  simple steps, confirms, and moves on. Accounts you decline are skipped.
+- `net-sift doctor` and the status bar now say "accounts" instead of "walled".
+
+### Added
+
+- `opencli.probe_login(site)` verifies a platform is actually logged in by running a
+  real search and checking for an error response.
+
 ## [0.3.2] - 2026-10-03
 
 ### Fixed
@@ -67,7 +83,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Installer that registers the MCP server and status bar for Claude Code and Codex.
 - Test suite, Ruff linting, and GitHub Actions CI.
 
-[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.4.0
 [0.3.2]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.3.2
 [0.3.1]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.3.1
 [0.3.0]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.3.0

@@ -44,6 +44,17 @@ WALLED_SEARCH = {
 }
 WALLED_SITES = tuple(WALLED_SEARCH)
 
+# Friendly name + login URL per platform, for the setup wizard.
+WALLED_META = {
+    "twitter": ("X (Twitter)", "https://x.com"),
+    "reddit": ("Reddit", "https://www.reddit.com"),
+    "instagram": ("Instagram", "https://www.instagram.com"),
+    "facebook": ("Facebook", "https://www.facebook.com"),
+    "bilibili": ("Bilibili", "https://www.bilibili.com"),
+    "xiaohongshu": ("Xiaohongshu (RED)", "https://www.xiaohongshu.com"),
+    "zhihu": ("Zhihu", "https://www.zhihu.com"),
+}
+
 
 class OpenCLIUnavailable(RuntimeError):
     pass
@@ -335,6 +346,33 @@ def make_source(site: str, command: str):
 
     source.__name__ = f"opencli_{site}"
     return source
+
+
+def probe_login(site: str, timeout: int = 60) -> bool:
+    """True when a real search on `site` works right now, which means the browser is
+    logged into it. Runs `opencli <site> search ... -f json`; a not-logged-in or
+    blocked platform returns an error object (`ok: false`) or a nonzero exit."""
+    exe = binary()
+    if not exe:
+        return False
+    try:
+        p = subprocess.run(
+            [exe, site, "search", "news", "--limit", "1", "-f", "json"],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    if p.returncode != 0 or not p.stdout.strip():
+        return False
+    try:
+        d = json.loads(p.stdout)
+    except ValueError:
+        return False
+    if isinstance(d, dict) and d.get("ok") is False:
+        return False
+    return True
 
 
 def walled_sources(connected: bool | None = None) -> dict[str, object]:

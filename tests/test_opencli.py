@@ -62,6 +62,35 @@ def test_walled_sources_deterministic():
     assert opencli.walled_sources(connected=False) == {}
 
 
+def test_walled_meta_complete():
+    assert set(opencli.WALLED_META) == set(opencli.WALLED_SEARCH)
+
+
+class _Proc:
+    def __init__(self, returncode, stdout):
+        self.returncode, self.stdout, self.stderr = returncode, stdout, ""
+
+
+def test_probe_login(monkeypatch):
+    monkeypatch.setattr(opencli, "binary", lambda: "/usr/bin/opencli")
+    monkeypatch.setattr(opencli.subprocess, "run", lambda *a, **k: _Proc(0, '[{"id": 1}]'))
+    assert opencli.probe_login("reddit") is True
+    # not logged in: nonzero exit
+    monkeypatch.setattr(opencli.subprocess, "run", lambda *a, **k: _Proc(1, '{"ok": false}'))
+    assert opencli.probe_login("twitter") is False
+    # ok:false with zero exit
+    monkeypatch.setattr(opencli.subprocess, "run", lambda *a, **k: _Proc(0, '{"ok": false}'))
+    assert opencli.probe_login("twitter") is False
+    # empty output
+    monkeypatch.setattr(opencli.subprocess, "run", lambda *a, **k: _Proc(0, ""))
+    assert opencli.probe_login("twitter") is False
+
+
+def test_probe_login_no_binary(monkeypatch):
+    monkeypatch.setattr(opencli, "binary", lambda: None)
+    assert opencli.probe_login("reddit") is False
+
+
 def test_parse_connected():
     doc = "[OK] Extension: connected (v1.0.24)\n[OK] Connectivity: connected in 4.6s"
     assert opencli._parse_connected(doc) is True

@@ -30,10 +30,13 @@ def test_run_wizard_all_present(tmp_path, monkeypatch, capsys):
     from net_sift.access import opencli
 
     monkeypatch.setattr(opencli, "available", lambda: True)
+    monkeypatch.setattr(opencli, "probe_login", lambda site, timeout=60: True)
     (tmp_path / ".claude.json").write_text("{}")
     rc = installer.run(tmp_path, assume_yes=True)
     out = capsys.readouterr().out
     assert rc == 0
     assert "Node v26.9.0 present" in out
     assert "OpenCLI already installed" in out
-    assert "Browser session connected" in out
+    assert "Browser connected" in out
+    assert "Reddit: connected" in out
+    assert "net-sift is installed" in out

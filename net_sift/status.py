@@ -24,7 +24,6 @@ def snapshot() -> dict:
 
 def line() -> str:
     s = snapshot()
-    oc = "green" if s["opencli"] else "red"
     walled = ",".join(s["walled"]) if s["walled"] else "none"
     dot = "\U0001f7e2" if s["opencli"] else "\U0001f534"
-    return f"net-sift {dot} opencli:{oc} | walled:{walled} | keyless:{s['keyless_count']}"
+    return f"net-sift {dot} accounts:{walled} | keyless:{s['keyless_count']}"

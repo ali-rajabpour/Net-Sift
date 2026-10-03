@@ -240,34 +240,64 @@ def _ensure_opencli(ui: _UI) -> bool:
             return False
 
 
-def _connect_browser(ui: _UI) -> bool:
+def _connect_bridge(ui: _UI) -> bool:
+    """Make sure OpenCLI's browser bridge is connected (daemon + extension)."""
     from .access import opencli
 
     ui.step("Connect your browser")
-    ui.info("Starting the OpenCLI daemon...")
+    ui.info("Starting OpenCLI and checking your browser...")
     if opencli.available():  # runs `opencli doctor`, which starts the daemon
-        ui.ok("Browser session connected")
+        ui.ok("Browser connected")
         return True
-    ui.info("OpenCLI reaches X, Reddit, Instagram, Facebook, Bilibili, and Xiaohongshu")
-    ui.info("through your own logged-in Chromium browser (Chrome, Edge, Brave, Arc, Comet).")
-    ui.info("1. Install the OpenCLI Browser Bridge extension, either one:")
+    ui.info("net-sift reads sites you are logged into (X, Reddit, Instagram, and more)")
+    ui.info("through a Chromium browser (Chrome, Edge, Brave, Arc, Comet).")
+    ui.info("One-time step: install the OpenCLI Browser Bridge extension, either one:")
     ui.info(f"   - Chrome Web Store: {OPENCLI_EXTENSION_URL}")
-    ui.info("   - or the latest opencli-extension zip from")
-    ui.info("     https://github.com/jackwener/opencli/releases (unzip, chrome://extensions,")
-    ui.info("     enable Developer mode, Load unpacked).")
-    ui.info("2. Open that Chromium browser and log into the platforms you want.")
+    ui.info("   - or the opencli-extension zip from")
+    ui.info("     https://github.com/jackwener/opencli/releases (unzip, open chrome://extensions,")
+    ui.info("     turn on Developer mode, click Load unpacked).")
     if ui.confirm("Open the Chrome Web Store page now?"):
         _open_url(OPENCLI_EXTENSION_URL)
     while True:
-        if not ui.pause("Press Enter once the extension is installed and you are logged in"):
-            ui.warn("Skipping walled platforms for now. Rerun net-sift install any time.")
+        if not ui.pause("Press Enter once the extension is installed and your browser is open"):
+            ui.warn("Skipping account setup. Rerun net-sift install any time.")
             return False
-        ui.info("Checking (starting the daemon, this takes a few seconds)...")
+        ui.info("Checking (takes a few seconds)...")
         if opencli.available():
-            ui.ok("Browser session connected")
+            ui.ok("Browser connected")
             return True
         ui.warn("Still not connected. Keep the browser open with the extension enabled.")
-        ui.info("You can also run `opencli doctor` in another terminal to see details.")
+
+
+def _connect_accounts(ui: _UI) -> None:
+    """Check each social account one by one; offer to connect the ones that are not."""
+    from .access import opencli
+
+    ui.step("Your accounts")
+    ui.info("Checking each site you can search. This opens your browser briefly per site.")
+    for site in opencli.WALLED_SITES:
+        name, url = opencli.WALLED_META[site]
+        ui.info(f"Checking {name}...")
+        if opencli.probe_login(site):
+            ui.ok(f"{name}: connected")
+            continue
+        if not ui.confirm(f"{name} is not connected. Connect it now?", default=True):
+            ui.info(f"{name}: skipped")
+            continue
+        ui.info(f"Log into {name}: opening {url}")
+        ui.info("Sign in as normal in that browser, then come back here.")
+        _open_url(url)
+        while True:
+            if not ui.pause(f"Press Enter once you are logged into {name}"):
+                ui.info(f"{name}: skipped")
+                break
+            ui.info("Verifying...")
+            if opencli.probe_login(site):
+                ui.ok(f"{name}: connected")
+                break
+            if not ui.confirm(f"{name} still not working. Try again?", default=False):
+                ui.info(f"{name}: skipped")
+                break
 
 
 def run(home: Path | None = None, assume_yes: bool = False) -> int:
@@ -276,13 +306,12 @@ def run(home: Path | None = None, assume_yes: bool = False) -> int:
     print("net-sift setup wizard")
     print("=" * 40)
     _setup_clients(ui, home)
-    if _ensure_node(ui):
-        if _ensure_opencli(ui):
-            _connect_browser(ui)
+    if _ensure_node(ui) and _ensure_opencli(ui) and _connect_bridge(ui):
+        _connect_accounts(ui)
 
-    ui.step("Summary")
-    from . import doctor as doctor_mod
-
-    print(doctor_mod.render())
-    print("\nSetup complete. Restart your client so it picks up net-sift.")
+    ui.step("Done")
+    ui.info("net-sift is installed. Keyless sources (Bluesky, Hacker News, GitHub, arXiv,")
+    ui.info("and more) always work. The accounts you connected above are searchable too.")
+    ui.info("Run `net-sift doctor` any time to see what is connected.")
+    print("\nRestart your client so it picks up net-sift.")
     return 0
