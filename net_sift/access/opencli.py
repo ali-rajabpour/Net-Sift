@@ -30,18 +30,19 @@ OPENCLI_BIN = os.environ.get("NET_SIFT_OPENCLI_BIN", "opencli")
 
 # Login platforms we route through OpenCLI. Keyless platforms (hackernews, etc.)
 # stay in the engine even though OpenCLI also offers them.
-WALLED_SITES = (
-    "twitter",
-    "x",
-    "reddit",
-    "instagram",
-    "facebook",
-    "bilibili",
-    "xiaohongshu",
-    "zhihu",
-)
-# Commands that mean "search this platform for a query", most to least preferred.
-_SEARCH_COMMANDS = ("search", "query", "feed")
+# Login platforms we route through OpenCLI, each mapped to its search command (all
+# verified to expose `search` in the OpenCLI adapter catalog). OpenCLI uses the id
+# `twitter` for X. Keyless platforms (hackernews, etc.) stay in the engine.
+WALLED_SEARCH = {
+    "twitter": "search",
+    "reddit": "search",
+    "instagram": "search",
+    "facebook": "search",
+    "bilibili": "search",
+    "xiaohongshu": "search",
+    "zhihu": "search",
+}
+WALLED_SITES = tuple(WALLED_SEARCH)
 
 
 class OpenCLIUnavailable(RuntimeError):
@@ -101,11 +102,14 @@ def available_cached(ttl: int = 60) -> bool:
     return val
 
 
-def status() -> str:
-    """One-line, secret-free summary for the doctor."""
+def status(connected: bool | None = None) -> str:
+    """One-line, secret-free summary for the doctor. Pass `connected` to reuse a
+    single connectivity check instead of running `opencli doctor` again."""
     if not binary():
         return "opencli: not installed (npm i -g @jackwener/opencli, or OpenCLIApp)"
-    if available():
+    if connected is None:
+        connected = available()
+    if connected:
         return "opencli: connected"
     return (
         "opencli: installed, no browser session connected (open a Chromium browser "
@@ -333,15 +337,12 @@ def make_source(site: str, command: str):
     return source
 
 
-def walled_sources(sites=WALLED_SITES) -> dict[str, object]:
-    """Discover installed walled adapters and build a source per searchable site."""
-    if not available():
+def walled_sources(connected: bool | None = None) -> dict[str, object]:
+    """Build a search source per walled platform, when a browser session is
+    connected. Uses the verified WALLED_SEARCH map rather than parsing `opencli
+    list`, so it is deterministic. Pass `connected` to reuse one connectivity check."""
+    if connected is None:
+        connected = available()
+    if not connected:
         return {}
-    catalog = discover()
-    out: dict[str, object] = {}
-    for site in sites:
-        cmds = catalog.get(site) or []
-        command = next((c for c in _SEARCH_COMMANDS if c in cmds), None)
-        if command:
-            out[site] = make_source(site, command)
-    return out
+    return {site: make_source(site, cmd) for site, cmd in WALLED_SEARCH.items()}

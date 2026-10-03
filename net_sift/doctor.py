@@ -17,10 +17,16 @@ from .engine import sources
 
 
 def report(probe: bool = False) -> dict:
-    """Structured health report. probe=True live-checks keyless sources (slower)."""
-    walled = opencli.walled_sources()
+    """Structured health report. probe=True live-checks keyless sources (slower).
+
+    OpenCLI connectivity is checked once and reused, since each check runs
+    `opencli doctor` (a few seconds); calling it several times also made the
+    summary contradict itself.
+    """
+    connected = opencli.available()
+    walled = opencli.walled_sources(connected=connected)
     data = {
-        "opencli": opencli.status(),
+        "opencli": opencli.status(connected=connected),
         "node": _node_version(),
         "walled_available": sorted(walled.keys()),
         "walled_supported": list(opencli.WALLED_SITES),
@@ -32,7 +38,7 @@ def report(probe: bool = False) -> dict:
     }
     if probe:
         data["keyless_reachable"] = _probe_keyless()
-    data["guidance"] = _guidance(walled)
+    data["guidance"] = _guidance(connected, walled)
     return data
 
 
@@ -66,9 +72,13 @@ def _probe_keyless() -> dict:
     return out
 
 
-def _guidance(walled: dict) -> str:
-    if walled:
-        return f"Walled platforms ready via OpenCLI: {', '.join(sorted(walled))}."
+def _guidance(connected: bool, walled: dict) -> str:
+    if connected and walled:
+        return (
+            f"Walled platforms reachable via OpenCLI: {', '.join(sorted(walled))}. "
+            "Each one still needs you logged into it in that browser; login is verified "
+            "when you search it."
+        )
     if not opencli.binary():
         return (
             "No walled platform reachable. Install OpenCLI (npm i -g @jackwener/opencli "

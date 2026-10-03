@@ -55,6 +55,13 @@ def test_available_false_without_binary(monkeypatch):
     assert opencli.walled_sources() == {}
 
 
+def test_walled_sources_deterministic():
+    s = opencli.walled_sources(connected=True)
+    assert set(s) == set(opencli.WALLED_SEARCH)
+    assert "twitter" in s and "x" not in s
+    assert opencli.walled_sources(connected=False) == {}
+
+
 def test_parse_connected():
     doc = "[OK] Extension: connected (v1.0.24)\n[OK] Connectivity: connected in 4.6s"
     assert opencli._parse_connected(doc) is True
