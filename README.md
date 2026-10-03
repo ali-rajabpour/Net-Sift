@@ -78,8 +78,16 @@ Only the summary returns to the caller.
 
 ## Install
 
+Install from source (not yet on PyPI):
+
 ```bash
-uv tool install net-sift      # or: pipx install net-sift
+uv tool install git+https://github.com/ali-rajabpour/Net-Sift.git
+# or: pipx install git+https://github.com/ali-rajabpour/Net-Sift.git
+```
+
+Then register it with your clients:
+
+```bash
 net-sift install              # register the MCP + status bar, check deps, run doctor
 ```
 
