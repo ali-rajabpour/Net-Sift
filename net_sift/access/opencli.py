@@ -348,14 +348,7 @@ def make_source(site: str, command: str):
     return source
 
 
-def probe_detail(site: str, timeout: int = 60) -> tuple[bool, str]:
-    """Probe a platform with a real search. Returns (connected, reason):
-    ("ok", True)         - search worked, so the browser is logged in and usable
-    (False, "blocked")   - OpenCLI could not open the site (anti-automation block
-                           or a broken adapter); logging in will NOT fix this
-    (False, "login")     - reachable but the search failed; a login may help
-    (False, "no-opencli")/("error") - opencli missing or an unexpected failure
-    """
+def _probe_once(site: str, timeout: int) -> tuple[bool, str]:
     exe = binary()
     if not exe:
         return False, "no-opencli"
@@ -381,6 +374,27 @@ def probe_detail(site: str, timeout: int = 60) -> tuple[bool, str]:
         msg = str((d.get("error") or {}).get("message", "")).lower()
         return False, ("blocked" if "navigation rejected" in msg else "login")
     return True, "ok"
+
+
+def probe_detail(site: str, timeout: int = 60, attempts: int = 2) -> tuple[bool, str]:
+    """Probe a platform with a real search. Returns (connected, reason):
+      (True, "ok")         - search worked, so the browser is logged in and usable
+      (False, "blocked")   - OpenCLI could not open the site (anti-automation block
+                             or a broken adapter); logging in will NOT fix this
+      (False, "login")     - reachable but the search failed; a login may help
+      (False, "no-opencli"/"error") - opencli missing or an unexpected failure
+
+    Retries transient failures: the first browser command after the daemon starts
+    is often flaky, so a logged-in account can falsely read as not connected on a
+    single try. A "blocked" or "no-opencli" result is definitive and not retried.
+    """
+    ok, reason = _probe_once(site, timeout)
+    for _ in range(max(0, attempts - 1)):
+        if ok or reason in ("blocked", "no-opencli"):
+            break
+        time.sleep(2)
+        ok, reason = _probe_once(site, timeout)
+    return ok, reason
 
 
 def probe_login(site: str, timeout: int = 60) -> bool:

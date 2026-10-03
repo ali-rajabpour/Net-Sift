@@ -6,6 +6,27 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-03
+
+### Added
+
+- Browser selection: the wizard detects installed Chromium browsers (Chrome, Edge,
+  Brave, Arc, Comet, Vivaldi, Opera, Chromium) on macOS, Windows, and Linux. When
+  several are present it asks which to use, remembers the choice, and opens the
+  extension and login pages in that browser.
+- The installer can add a net-sift line below your existing status bar instead of
+  replacing it, via a wrapper that preserves and can restore the original.
+
+### Changed
+
+- The account check never auto-skips. For every account that is not connected it
+  asks whether to connect it and, on yes, gives instructions and verifies; retries
+  are user-driven, not automatic.
+- The account probe retries a transient failure, so a logged-in account no longer
+  reads as disconnected just because the first browser command after startup was
+  flaky (fixes X intermittently showing as not connected).
+- The status bar segment is shorter: `net-sift <dot><keyless>+<accounts>`.
+
 ## [0.4.2] - 2026-10-03
 
 ### Fixed
@@ -101,7 +122,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Installer that registers the MCP server and status bar for Claude Code and Codex.
 - Test suite, Ruff linting, and GitHub Actions CI.
 
-[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.5.0
 [0.4.2]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.4.2
 [0.4.1]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.4.1
 [0.4.0]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.4.0

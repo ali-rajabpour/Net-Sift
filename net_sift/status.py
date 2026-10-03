@@ -23,7 +23,9 @@ def snapshot() -> dict:
 
 
 def line() -> str:
+    """Compact one-segment status, sized to sit next to other status items.
+    Example: `net-sift ●11+7` (11 keyless sources, 7 connected accounts)."""
     s = snapshot()
-    walled = ",".join(s["walled"]) if s["walled"] else "none"
-    dot = "\U0001f7e2" if s["opencli"] else "\U0001f534"
-    return f"net-sift {dot} accounts:{walled} | keyless:{s['keyless_count']}"
+    dot = "●" if s["opencli"] else "○"  # filled when a browser is connected
+    acc = f"+{len(s['walled'])}" if s["walled"] else ""
+    return f"net-sift {dot}{s['keyless_count']}{acc}"
