@@ -21,13 +21,12 @@ import json
 import os
 import shutil
 import subprocess
-import urllib.request
+import time
 from datetime import datetime, timezone
 
 from ..engine.core import Record, parse_iso, rec
 
 OPENCLI_BIN = os.environ.get("NET_SIFT_OPENCLI_BIN", "opencli")
-_DAEMON_STATUS_URL = "http://127.0.0.1:19825/status"  # loopback, side-effect-free
 
 # Login platforms we route through OpenCLI. Keyless platforms (hackernews, etc.)
 # stay in the engine even though OpenCLI also offers them.
@@ -53,37 +52,65 @@ def binary() -> str | None:
     return shutil.which(OPENCLI_BIN)
 
 
-def daemon_status(timeout: int = 2) -> dict | None:
-    """Read OpenCLI's loopback status without starting the CLI (which has side
-    effects). None when the daemon is not reachable."""
+def doctor_text(timeout: int = 30) -> str | None:
+    """Run ``opencli doctor``. This both STARTS the daemon (it only auto-starts on
+    an opencli command) and reports connectivity. None when the binary is absent or
+    the call fails. Takes a few seconds, so callers that run often should use
+    ``available_cached``."""
+    exe = binary()
+    if not exe:
+        return None
     try:
-        req = urllib.request.Request(_DAEMON_STATUS_URL, headers={"X-OpenCLI": "1"})
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            return json.loads(r.read(64 * 1024))
-    except Exception:
+        p = subprocess.run([exe, "doctor"], capture_output=True, text=True, timeout=timeout)
+        return (p.stdout or "") + (p.stderr or "")
+    except (OSError, subprocess.SubprocessError):
         return None
 
 
+def _parse_connected(text: str | None) -> bool:
+    if not text:
+        return False
+    low = text.lower()
+    return "connectivity: connected" in low or "extension: connected" in low
+
+
 def available() -> bool:
-    """True when the binary exists, the daemon answers, and a browser is connected."""
-    if not binary():
-        return False
-    st = daemon_status()
-    if not st:
-        return False
-    return bool(st.get("extension_connected") or st.get("connected") or st.get("ready"))
+    """True when opencli is installed and a browser session is connected. Runs
+    ``opencli doctor``, which starts the daemon if needed, so calling this is also
+    what brings a freshly installed OpenCLI online."""
+    return _parse_connected(doctor_text())
+
+
+def available_cached(ttl: int = 60) -> bool:
+    """available() with a short on-disk cache, for frequent callers (status bar)."""
+    from .. import config
+
+    cache = config.HOME / ".opencli_status"
+    try:
+        d = json.loads(cache.read_text())
+        if time.time() - d.get("ts", 0) < ttl:
+            return bool(d.get("available"))
+    except (OSError, ValueError):
+        pass
+    val = available()
+    try:
+        config.HOME.mkdir(parents=True, exist_ok=True)
+        cache.write_text(json.dumps({"ts": time.time(), "available": val}))
+    except OSError:
+        pass
+    return val
 
 
 def status() -> str:
     """One-line, secret-free summary for the doctor."""
     if not binary():
         return "opencli: not installed (npm i -g @jackwener/opencli, or OpenCLIApp)"
-    st = daemon_status()
-    if not st:
-        return "opencli: installed, daemon not running (open Chrome with the OpenCLI extension)"
     if available():
         return "opencli: connected"
-    return "opencli: daemon up, browser/extension not connected (open Chrome, enable the extension)"
+    return (
+        "opencli: installed, no browser session connected (open a Chromium browser "
+        "with the OpenCLI extension and log in; the daemon starts automatically)"
+    )
 
 
 def run(

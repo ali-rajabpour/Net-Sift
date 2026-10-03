@@ -6,6 +6,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-03
+
+### Fixed
+
+- The install wizard now starts the OpenCLI daemon itself. OpenCLI's daemon only
+  starts when an opencli command runs, so the browser extension stayed at
+  "reconnecting" and the wizard never detected it. Connectivity is now determined
+  by running `opencli doctor` (which starts the daemon and reports status) instead
+  of an unverified status port, and the status bar caches the result.
+
 ## [0.3.0] - 2026-10-03
 
 ### Changed
@@ -46,7 +56,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Installer that registers the MCP server and status bar for Claude Code and Codex.
 - Test suite, Ruff linting, and GitHub Actions CI.
 
-[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.3.1
 [0.3.0]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.3.0
 [0.2.0]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.2.0
 [0.1.0]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.1.0

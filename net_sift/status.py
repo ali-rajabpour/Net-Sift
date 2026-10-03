@@ -11,10 +11,13 @@ from .engine import sources
 
 
 def snapshot() -> dict:
-    walled = sorted(opencli.walled_sources().keys())
+    # Cached: the status bar refreshes often and a live `opencli doctor` takes
+    # several seconds. Walled set is shown as the supported platforms when a
+    # browser session is connected; `net-sift doctor` enumerates the live adapters.
+    connected = opencli.available_cached()
     return {
-        "opencli": opencli.available(),
-        "walled": walled,
+        "opencli": connected,
+        "walled": sorted(opencli.WALLED_SITES) if connected else [],
         "keyless_count": len(sources.SOURCES),
     }
 

@@ -53,3 +53,35 @@ def test_available_false_without_binary(monkeypatch):
     monkeypatch.setattr(opencli, "binary", lambda: None)
     assert opencli.available() is False
     assert opencli.walled_sources() == {}
+
+
+def test_parse_connected():
+    doc = "[OK] Extension: connected (v1.0.24)\n[OK] Connectivity: connected in 4.6s"
+    assert opencli._parse_connected(doc) is True
+    assert opencli._parse_connected("Extension: disconnected") is False
+    assert opencli._parse_connected(None) is False
+
+
+def test_available_from_doctor(monkeypatch):
+    monkeypatch.setattr(
+        opencli, "doctor_text", lambda timeout=30: "[OK] Connectivity: connected in 1s"
+    )
+    assert opencli.available() is True
+    monkeypatch.setattr(opencli, "doctor_text", lambda timeout=30: "[!] Extension: reconnecting")
+    assert opencli.available() is False
+
+
+def test_available_cached(tmp_path, monkeypatch):
+    from net_sift import config
+
+    monkeypatch.setattr(config, "HOME", tmp_path)
+    calls = []
+
+    def fake_doctor(timeout=30):
+        calls.append(1)
+        return "Connectivity: connected"
+
+    monkeypatch.setattr(opencli, "doctor_text", fake_doctor)
+    assert opencli.available_cached() is True
+    assert opencli.available_cached() is True  # second read hits cache
+    assert len(calls) == 1

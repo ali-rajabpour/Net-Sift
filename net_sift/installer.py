@@ -244,25 +244,30 @@ def _connect_browser(ui: _UI) -> bool:
     from .access import opencli
 
     ui.step("Connect your browser")
-    if opencli.available():
+    ui.info("Starting the OpenCLI daemon...")
+    if opencli.available():  # runs `opencli doctor`, which starts the daemon
         ui.ok("Browser session connected")
         return True
     ui.info("OpenCLI reaches X, Reddit, Instagram, Facebook, Bilibili, and Xiaohongshu")
     ui.info("through your own logged-in Chromium browser (Chrome, Edge, Brave, Arc, Comet).")
-    ui.info("1. Install the OpenCLI Browser Bridge extension.")
-    ui.info("2. Open your Chromium browser and log into the platforms you want.")
-    if ui.confirm("Open the extension page in your browser now?"):
+    ui.info("1. Install the OpenCLI Browser Bridge extension, either one:")
+    ui.info(f"   - Chrome Web Store: {OPENCLI_EXTENSION_URL}")
+    ui.info("   - or the latest opencli-extension zip from")
+    ui.info("     https://github.com/jackwener/opencli/releases (unzip, chrome://extensions,")
+    ui.info("     enable Developer mode, Load unpacked).")
+    ui.info("2. Open that Chromium browser and log into the platforms you want.")
+    if ui.confirm("Open the Chrome Web Store page now?"):
         _open_url(OPENCLI_EXTENSION_URL)
-    else:
-        ui.info(f"   Extension: {OPENCLI_EXTENSION_URL}")
     while True:
         if not ui.pause("Press Enter once the extension is installed and you are logged in"):
             ui.warn("Skipping walled platforms for now. Rerun net-sift install any time.")
             return False
+        ui.info("Checking (starting the daemon, this takes a few seconds)...")
         if opencli.available():
             ui.ok("Browser session connected")
             return True
-        ui.warn("Still not connected. Make sure the browser is open and the extension is enabled.")
+        ui.warn("Still not connected. Keep the browser open with the extension enabled.")
+        ui.info("You can also run `opencli doctor` in another terminal to see details.")
 
 
 def run(home: Path | None = None, assume_yes: bool = False) -> int:
