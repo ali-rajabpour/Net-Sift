@@ -6,6 +6,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-03
+
+### Fixed
+
+- The installer no longer overwrites an existing Claude Code status bar. If one is
+  already set (for example a plugin's status line), net-sift keeps it and points you
+  to `net-sift status` instead of replacing it.
+
 ## [0.4.0] - 2026-10-03
 
 ### Changed
@@ -83,7 +91,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Installer that registers the MCP server and status bar for Claude Code and Codex.
 - Test suite, Ruff linting, and GitHub Actions CI.
 
-[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.4.1
 [0.4.0]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.4.0
 [0.3.2]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.3.2
 [0.3.1]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.3.1

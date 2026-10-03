@@ -29,6 +29,17 @@ def test_ensure_statusline(tmp_path):
     assert "already set" in cli.ensure_statusline(p)
 
 
+def test_ensure_statusline_never_clobbers_existing(tmp_path):
+    p = tmp_path / "settings.json"
+    mine = {"type": "command", "command": "bash /some/caveman-statusline.sh"}
+    p.write_text(json.dumps({"statusLine": mine, "keep": 1}))
+    msg = cli.ensure_statusline(p)
+    assert "kept your existing" in msg
+    data = json.loads(p.read_text())
+    assert data["statusLine"] == mine  # untouched
+    assert data["keep"] == 1
+
+
 def test_ensure_codex_appends_once(tmp_path):
     p = tmp_path / "config.toml"
     p.write_text("[existing]\nkey = 1\n")

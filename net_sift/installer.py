@@ -73,8 +73,15 @@ def ensure_statusline(path: Path) -> str:
         except ValueError:
             return f"skipped {path} (not valid JSON; add statusLine manually)"
     line = {"type": "command", "command": "net-sift status --line", "padding": 0}
-    if data.get("statusLine") == line:
+    existing = data.get("statusLine")
+    if existing == line:
         return f"status bar already set in {path}"
+    # Never clobber someone else's status bar. Only set ours when none exists.
+    if isinstance(existing, dict) and "net-sift" not in str(existing.get("command", "")):
+        return (
+            "kept your existing status bar (net-sift did not change it); "
+            "see net-sift status in a terminal with `net-sift status`"
+        )
     data["statusLine"] = line
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
