@@ -28,8 +28,6 @@ jobs:
   publish:
     needs: build
     runs-on: ubuntu-latest
-    # Enable once PyPI trusted publishing is configured for this repository.
-    if: false
     environment: pypi
     permissions:
       id-token: write
