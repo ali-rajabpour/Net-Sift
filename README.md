@@ -24,6 +24,7 @@ reverse engineering.
 - [Install](#install)
 - [Quickstart](#quickstart)
 - [Walled platforms](#walled-platforms)
+- [Optional features](#optional-features)
 - [Sources](#sources)
 - [MCP tools](#mcp-tools)
 - [Configuration](#configuration)
@@ -46,8 +47,8 @@ single search would under-serve the answer.
 
 - Many sources in one sweep, keyless by default (Bluesky, Hacker News, GitHub,
   arXiv, Polymarket, StockTwits, Mastodon, and more).
-- Walled platforms (Twitter/X, Reddit, Instagram, Facebook, Bilibili, Xiaohongshu)
-  through your logged-in Chromium browser via OpenCLI.
+- Walled platforms (Twitter/X, Reddit, Instagram, Facebook, Bilibili, Xiaohongshu,
+  Zhihu) through your logged-in Chromium browser via OpenCLI.
 - Relevance ranking with head-entity grounding, CJK-aware tokenization, a recency
   boost, and engagement weighting.
 - A gap-closing driver that bisects the time window to recover tails a source
@@ -57,6 +58,10 @@ single search would under-serve the answer.
 - Context-lean by design: the agent receives summaries, coverage, gaps, and the
   top results, never the raw corpus.
 - Saved sessions you can continue later, deleted only on your confirmation.
+- Opt-in extras: dark-web discussion search (Tor, read-only and information-only)
+  and per-account Instagram recon (HikerAPI).
+- A guided installer that picks your browser, checks each account, and adds a
+  `[NET-SIFT]` status line.
 
 ## How it works
 
@@ -81,24 +86,31 @@ Only the summary returns to the caller.
 
 ## Install
 
-Install from source (not yet on PyPI):
-
 ```bash
-uv tool install git+https://github.com/ali-rajabpour/Net-Sift.git
-# or: pipx install git+https://github.com/ali-rajabpour/Net-Sift.git
+uv tool install net-sift        # or: pipx install net-sift
 ```
 
 Then run the setup wizard:
 
 ```bash
-net-sift install              # guided: clients, OpenCLI, browser; add --yes for unattended
+net-sift install                # guided; add --yes for unattended
 ```
 
-`net-sift install` is a wizard. It registers the MCP server and status bar with the
-clients it finds (Claude Code, Codex), installs OpenCLI automatically through npm
-with your consent, and walks you through connecting a Chromium browser, rechecking
-as it goes. Each step asks before it changes anything. Restart your client
-afterward so it picks up the server.
+`net-sift install` is a wizard. It:
+
+- registers the MCP server and a status bar with the clients it finds (Claude Code,
+  Codex), adding a `[NET-SIFT]` line below any status bar you already have rather
+  than replacing it;
+- installs OpenCLI through npm with your consent;
+- detects your Chromium browsers and, if you have more than one, asks which to use,
+  then opens the extension and login pages in it;
+- checks each walled account one by one and, for any that is not connected, asks
+  whether to connect it and walks you through logging in;
+- offers the optional extras: Tor (for dark-web discussion search) and a HikerAPI
+  key (for Instagram account recon).
+
+Every step asks before it changes anything. Restart your client afterward so it
+picks up the server.
 
 ## Quickstart
 
@@ -118,9 +130,10 @@ ranked items, and the corpus path.
 
 ## Walled platforms
 
-Twitter/X, Reddit, Instagram, Facebook, Bilibili, and Xiaohongshu need a logged-in
-Chromium browser and OpenCLI. See [net_sift/guides/setup-opencli.md](net_sift/guides/setup-opencli.md).
-Short version:
+Twitter/X, Reddit, Instagram, Facebook, Bilibili, Xiaohongshu, and Zhihu need a
+logged-in Chromium browser and OpenCLI. `net-sift install` handles most of this;
+see [net_sift/guides/setup-opencli.md](net_sift/guides/setup-opencli.md) for the
+manual version:
 
 1. Install Node 20.18.1+ and `@jackwener/opencli` (or OpenCLIApp).
 2. Use a Chromium browser (Chrome, Edge, Brave, Arc, Comet, and so on) with the
@@ -128,7 +141,20 @@ Short version:
 3. Log into the platforms you want in that browser.
 4. Run `net-sift doctor` to confirm.
 
-Desktop only. There is no headless or server path for walled platforms.
+Desktop only. There is no headless or server path for walled platforms. Some
+platforms (for example Facebook) block automated navigation even when you are
+logged in; net-sift reports that honestly and moves on rather than looping.
+
+## Optional features
+
+- **Dark-web discussion search** (`darkweb_search`): read-only, information-only
+  search across Tor onion forums, with a non-optional filter that drops markets,
+  credentials, drugs, weapons, and abuse. Needs `tor`; net-sift starts and stops
+  its own ephemeral Tor. `net-sift install` offers to set it up.
+- **Instagram account recon** (`instagram_recon`): profile, timeline, posting
+  locations, top engagers, followers, and shared-follower intersection via
+  HikerAPI. Metered and opt-in; the wizard stores your key at
+  `~/.net-sift/secrets.json` (0600), or set `HIKERAPI_KEY` in the environment.
 
 ## Sources
 
@@ -153,10 +179,14 @@ sources are on by default; walled sources appear once OpenCLI is connected.
 | Variable | Effect |
 |----------|--------|
 | `GITHUB_TOKEN` | higher GitHub Search API rate limit |
+| `HIKERAPI_KEY` | enables Instagram account recon |
 | `NET_SIFT_HOME` | session storage location (default `~/.net-sift`) |
 | `NET_SIFT_OPENCLI_BIN` | path to the `opencli` binary if not on `PATH` |
 
-All configuration is read from the environment. Net-Sift stores no credentials.
+Keys are read from the environment first. The only credential net-sift persists is
+an optional HikerAPI key you supply in the wizard, saved to
+`~/.net-sift/secrets.json` with 0600 permissions. Walled platforms use your own
+browser session; net-sift never reads or copies browser cookies.
 
 ## Sessions and privacy
 

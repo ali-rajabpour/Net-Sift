@@ -20,20 +20,29 @@
 
 | Source | Requires |
 |--------|----------|
-| `twitter` / `x` | logged-in Chromium session |
+| `twitter` | logged-in Chromium session |
 | `reddit` | logged-in Chromium session |
 | `instagram` | logged-in Chromium session |
-| `facebook` | logged-in Chromium session |
+| `facebook` | logged-in Chromium session (often blocks automation even so) |
 | `bilibili` | logged-in Chromium session |
 | `xiaohongshu` | logged-in Chromium session |
+| `zhihu` | logged-in Chromium session |
 
 Walled sources appear automatically once OpenCLI is connected and you are logged
 in. See `setup-opencli.md`. Run `net-sift doctor` to see the live set.
+
+## Opt-in tools (separate from the sweep)
+
+| Tool | What it covers | Requires |
+|------|----------------|----------|
+| `darkweb_search` | Tor onion-forum discussion (read-only, information-only; markets/credentials/illegal categories filtered out) | `tor` installed |
+| `instagram_recon` | per-account Instagram analysis (profile, timeline, where, fans, followers, intersect) | HikerAPI key |
 
 ## Optional environment variables
 
 | Variable | Effect |
 |----------|--------|
 | `GITHUB_TOKEN` | higher GitHub Search API rate limit |
+| `HIKERAPI_KEY` | enables Instagram account recon |
 | `NET_SIFT_HOME` | where sessions are stored (default `~/.net-sift`) |
 | `NET_SIFT_OPENCLI_BIN` | path to the `opencli` binary if not on `PATH` |
