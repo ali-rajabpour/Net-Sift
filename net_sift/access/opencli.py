@@ -296,6 +296,12 @@ def _items(payload) -> list[dict]:
     return []
 
 
+# Transient browser-driver hiccups that clear on a retry (a navigation rejected on
+# the first command after launch, a CDP command that raced the page). A real block
+# (AUTH_REQUIRED, EMPTY_RESULT, a missing binary) is not here and is not retried.
+_TRANSIENT = ("navigation rejected", "inspected target navigated", "cdp command", "timed out")
+
+
 def make_source(site: str, command: str, name: str | None = None, max_limit: int = 100):
     """Build an engine source that searches one site via OpenCLI. `name` is the
     source name records carry, when it differs from the OpenCLI site id."""
@@ -307,8 +313,7 @@ def make_source(site: str, command: str, name: str | None = None, max_limit: int
                 payload = run(site, command, query, limit=min(budget, max_limit))
                 break
             except OpenCLIUnavailable as e:
-                # The bridge rejects a navigation now and then; the next try passes.
-                if "navigation rejected" not in str(e).lower() or attempt == 2:
+                if not any(t in str(e).lower() for t in _TRANSIENT) or attempt == 2:
                     raise
                 time.sleep(2)
         out: list[Record] = []

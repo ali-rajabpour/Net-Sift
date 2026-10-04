@@ -61,6 +61,21 @@ def test_make_source_retries_rejected_navigation(monkeypatch):
     assert recs[0]["source"] == "google" and ceiling is False
 
 
+def test_make_source_retries_transient_cdp_error(monkeypatch):
+    calls = []
+
+    def fake_run(site, command, query, limit=None):
+        calls.append(1)
+        if len(calls) < 2:
+            raise opencli.OpenCLIUnavailable("opencli tiktok search exit 1: UNKNOWN CDP command")
+        return [{"title": "t", "url": "u"}]
+
+    monkeypatch.setattr(opencli, "run", fake_run)
+    monkeypatch.setattr(opencli.time, "sleep", lambda s: None)
+    recs, _ = opencli.make_source("tiktok", "search")("q", None, None, 10)
+    assert len(calls) == 2 and recs[0]["source"] == "tiktok"
+
+
 def test_make_source_does_not_retry_other_errors(monkeypatch):
     def fake_run(site, command, query, limit=None):
         raise opencli.OpenCLIUnavailable("opencli binary not found")

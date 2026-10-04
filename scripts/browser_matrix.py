@@ -37,12 +37,18 @@ def main() -> int:
         print(f"No managed profile at {pdir}. Run `net-sift install`.")
         return 1
 
-    sites = [
-        (name, cmd, ZH if name in ("weixin", "tieba") else EN)
-        for name, (_, cmd, _, _) in opencli.OPEN_SEARCH.items()
+    # Build each source the way a real sweep does (make_source carries the transient
+    # retry), so the matrix reflects production behavior, not a single raw call.
+    checks = [
+        (name, opencli.make_source(site, cmd, name, cap), ZH if name in ("weixin", "tieba") else EN)
+        for name, (site, cmd, cap, _) in opencli.OPEN_SEARCH.items()
     ]
-    sites += [
-        (s, "search", ZH if s in ("bilibili", "xiaohongshu", "zhihu", "weibo") else EN)
+    checks += [
+        (
+            s,
+            opencli.make_source(s, "search"),
+            ZH if s in ("bilibili", "xiaohongshu", "zhihu") else EN,
+        )
         for s in opencli.WALLED_SITES
     ]
 
@@ -50,11 +56,10 @@ def main() -> int:
     with browser.managed_browser(found["executable"], str(pdir)) as endpoint:
         opencli.set_endpoint(endpoint)
         try:
-            for name, cmd, q in sites:
+            for name, source, q in checks:
                 try:
-                    out = opencli.run(name, cmd, q, limit=5)
-                    n = len(out) if isinstance(out, list) else 0
-                    print(f"  {name:14} OK ({n})" if n else f"  {name:14} EMPTY")
+                    recs, _ = source(q, None, None, 5)
+                    print(f"  {name:14} OK ({len(recs)})" if recs else f"  {name:14} EMPTY")
                 except Exception as e:
                     failures += 1
                     print(f"  {name:14} FAIL {str(e)[:80]}")
