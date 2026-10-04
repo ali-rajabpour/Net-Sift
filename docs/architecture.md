@@ -20,16 +20,23 @@ report records anything that still could not be reached.
 
 ## Access (`net_sift/access/`)
 
-- `opencli.py` reaches walled login platforms through the user's logged-in
-  Chromium browser via OpenCLI. Adapters are discovered at runtime with
-  `opencli list`; net-sift shells to `opencli <site> <command> -f json` and
-  normalizes the output into the same record shape, so the raw payload never
-  reaches the agent.
+- `browsers.py` discovers installed Chromium browsers (executable + source profile).
+- `profile.py` copies a chosen browser's profile into `~/.net-sift/profiles/<id>/`
+  (0700) and detects logged-in sites by reading cookie names only; cookie values are
+  never decrypted, so the copy is only ever driven by its own browser binary.
+- `browser.py` launches that browser headless over CDP with a random loopback
+  debugging port, and kills and verifies it dead when the sweep ends.
+- `opencli.py` drives the managed browser by setting `OPENCLI_CDP_ENDPOINT` and
+  shelling to `opencli <site> <command> -f json`, serialized so concurrent calls do
+  not crash the shared page. Output is normalized into the record shape, so the raw
+  payload never reaches the agent. Walled and web source maps are verified constants,
+  not runtime discovery.
 
 ## Server and surface
 
-- `search.py` merges keyless sources with any connected walled adapters, runs the
-  sweep, saves a session, and returns a summary.
+- `search.py` merges keyless sources with the browser-backed adapters, opens one
+  managed headless browser for the sweep when any are selected, runs it, saves a
+  session, and returns a summary.
 - `sessions.py` stores each search under `~/.net-sift/sessions/<id>/` as
   `corpus.jsonl` plus `meta.json`. The corpus is kept until the user confirms a
   delete.
@@ -42,6 +49,6 @@ report records anything that still could not be reached.
 ## Design rules
 
 - Read-only: no posting, commenting, liking, or auth bypass.
-- One path per environment, no silent fallbacks. Walled platforms need a desktop
-  Chromium session; where that is absent they are a declared gap.
+- One path per environment, no silent fallbacks. Walled and web sources need a
+  managed browser profile; where that is absent they are a declared gap.
 - Recency is a ranking boost, never a hard window.

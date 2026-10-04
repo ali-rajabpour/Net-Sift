@@ -6,9 +6,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-04
+
 ### Added
 
-- General web search: `google` through the connected browser, and `brave` through
+- Headless browser access: net-sift launches its own Chromium headless over the
+  DevTools protocol from a copy of your logged-in profile, so walled and web sources
+  run with your browser closed. The browser is killed and verified dead after every
+  sweep, so nothing is left running.
+- `net-sift install` now detects your Chromium browsers, shows which sites each is
+  signed into, copies the one you choose into `~/.net-sift/profiles/<id>/` (0700),
+  and offers to log into any missing walled site, one at a time.
+- `net-sift login [sites]`: open the managed profile and sign into walled platforms.
+- Session detection by cookie name (no values decrypted) in `doctor` and `status`.
+- General web search: `google` through the managed browser, and `brave` through
   the Brave Search API when `BRAVE_API_KEY` is set (capped at 10 requests and 200
   results per sweep, never bisected).
 - News: `gdelt` (keyless, 65 languages, bisected by date), `google_news`, `reuters`.
@@ -16,10 +27,22 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Long-form: `substack`, `medium`. Small web: `marginalia`.
 - Reference and archive: `stackoverflow`, `wikipedia`, `wikidata`, `archive`.
 - Chinese: `weixin`, `tieba`.
-- Telegram channel discovery: with a browser connected, the sweep finds public
+- Telegram channel discovery: with the managed browser open, the sweep finds public
   channels for the query through Google and reads them, so `telegram` no longer
   needs a hand-written channel list.
-- `net-sift doctor` lists the open web sources and the new optional keys.
+
+### Changed
+
+- Walled and web sources now require a managed browser profile instead of a live
+  browser with the OpenCLI bridge extension. `doctor` and `status` report the chosen
+  browser, whether the profile is ready, and which accounts are signed in.
+- macOS only this release; Windows and Linux are planned.
+
+### Removed
+
+- The OpenCLI browser-bridge extension path and its daemon/extension connectivity
+  checks. net-sift drives the browser directly over CDP; the extension is no longer
+  installed or required.
 
 ### Fixed
 
@@ -208,7 +231,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Installer that registers the MCP server and status bar for Claude Code and Codex.
 - Test suite, Ruff linting, and GitHub Actions CI.
 
-[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/ali-rajabpour/Net-Sift/compare/v0.6.2...v1.0.0
 [0.6.2]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.6.2
 [0.6.1]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.6.1
 [0.6.0]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.6.0

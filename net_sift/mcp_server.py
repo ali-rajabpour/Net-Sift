@@ -31,10 +31,11 @@ def deep_search(
     """Sweep many sources for everything said about `query`, rank it, and report
     coverage plus honest gaps.
 
-    platforms: subset of source names (omit for the default keyless set plus any
-    connected walled platforms). since/until: YYYY-MM-DD (the window bounds
-    retrieval; recency is a ranking boost, not a hard cut). Returns a summary and
-    the on-disk corpus path; call resume()/cleanup() to continue or delete it.
+    platforms: subset of source names (omit for the default keyless set plus the
+    browser-backed sources when a managed profile exists). since/until: YYYY-MM-DD
+    (the window bounds retrieval; recency is a ranking boost, not a hard cut). Returns
+    a summary and the on-disk corpus path; call resume()/cleanup() to continue or
+    delete it.
     """
     return search_mod.deep_search(
         query, platforms=platforms, since=since, until=until, max_budget=max_budget, rank=rank
@@ -75,8 +76,8 @@ def cleanup(session_id: str) -> dict:
 
 @mcp.tool()
 def doctor(probe: bool = False) -> dict:
-    """Report which sources net-sift can reach now, and how to connect walled
-    platforms. probe=True also live-checks the keyless sources."""
+    """Report which sources net-sift can reach now, the managed browser, and which
+    accounts are signed in. probe=True also live-checks the keyless sources."""
     return doctor_mod.report(probe=probe)
 
 

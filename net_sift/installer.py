@@ -253,7 +253,6 @@ LOGIN_URLS = {
     "bilibili": "https://passport.bilibili.com/login",
     "xiaohongshu": "https://www.xiaohongshu.com",
     "zhihu": "https://www.zhihu.com/signin",
-    "weibo": "https://weibo.com/login.php",
 }
 
 

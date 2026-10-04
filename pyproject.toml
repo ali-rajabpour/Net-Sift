@@ -1,6 +1,6 @@
 [project]
 name = "net-sift"
-version = "0.6.2"
+version = "1.0.0"
 description = "Coverage-first social and web deep-search as an MCP server: exhaustive multi-source sweeps, smart ranking, and honest gap accounting, with walled platforms reached through your logged-in Chromium browser."
 authors = [{ name = "Ali Rajabpour", email = "ali@rajabpour.com" }]
 license = "AGPL-3.0-or-later"

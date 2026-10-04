@@ -61,8 +61,10 @@ Sources marked *browser* need a connected Chromium session; the rest need only t
 | `xiaohongshu` | logged-in Chromium session |
 | `zhihu` | logged-in Chromium session |
 
-Walled sources appear automatically once OpenCLI is connected and you are logged
-in. See `setup-opencli.md`. Run `net-sift doctor` to see the live set.
+Walled sources become available once net-sift has a managed browser profile (copied
+from your logged-in Chromium during `net-sift install`); searches then run headless
+with the browser closed. See `setup-opencli.md`. Run `net-sift doctor` to see which
+accounts are signed in.
 
 ## Opt-in tools (separate from the sweep)
 
