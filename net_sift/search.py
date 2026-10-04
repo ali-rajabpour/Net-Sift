@@ -7,21 +7,42 @@ the raw corpus back, only a summary plus the on-disk path.
 
 from __future__ import annotations
 
+import contextlib
 import os
 from datetime import datetime, timedelta, timezone
 
 from . import config, sessions
-from .access import opencli
+from .access import browser, browsers, opencli, profile
 from .engine import core, sources
 
 
-def all_sources() -> dict[str, core.Source]:
-    """Keyless engine sources, whatever OpenCLI sources are live, and the Brave
-    Search API when a key is set."""
+def _managed_profile() -> tuple[str, str] | None:
+    """(executable, managed profile dir) for the chosen browser, if its managed copy
+    exists. Choice comes from NET_SIFT_BROWSER or the wizard's saved pick."""
+    bid = os.environ.get("NET_SIFT_BROWSER") or config.get_browser_choice(config.HOME)
+    if not bid:
+        return None
+    found = browsers.detect().get(bid)
+    if not found:
+        return None
+    managed = profile.managed_dir(config.HOME, bid)
+    if not managed.is_dir():
+        return None
+    return found["executable"], str(managed)
+
+
+def _needs_browser(names: list[str], source_map: dict) -> bool:
+    browser_sources = set(opencli.WALLED_SITES) | set(opencli.OPEN_SEARCH)
+    return any(n in browser_sources for n in names)
+
+
+def all_sources(with_browser: bool = False) -> dict[str, core.Source]:
+    """Keyless engine sources, the Brave Search API when keyed, and, when a managed
+    browser will be opened for this sweep, the OpenCLI walled and open-web sources."""
     merged: dict[str, core.Source] = dict(sources.SOURCES)
-    connected = opencli.available()
-    merged.update(opencli.walled_sources(connected))
-    merged.update(opencli.open_sources(connected))
+    if with_browser:
+        merged.update(opencli.walled_sources(connected=True))
+        merged.update(opencli.open_sources(connected=True))
     key = config.get_secret("BRAVE_API_KEY")
     if key:
         merged["brave"] = lambda q, s, u, b: sources.src_brave(q, s, u, b, key)
@@ -74,35 +95,56 @@ def deep_search(
     top_n: int = 10,
 ) -> dict:
     """Run a sweep, save the session, and return a summary (no raw corpus)."""
-    source_map = all_sources()
-    tg_gap = None
-    wants_telegram = platforms is None or "telegram" in platforms
-    if not tg_channels and wants_telegram and "google" in source_map:
-        try:
-            tg_channels = discover_telegram(query, source_map)
-        except Exception as e:  # a failed discovery is a declared gap, like any source
-            tg_gap = f"telegram[0] FAILED: channel discovery: {type(e).__name__}: {e}"
-    if tg_channels:
-        source_map["telegram"] = lambda q, s, u, b: sources.src_telegram(q, s, u, b, tg_channels)
+    managed = _managed_profile()
+    source_map = all_sources(with_browser=managed is not None)
     names = [p for p in (platforms or default_names(source_map)) if p in source_map]
-    if tg_channels and platforms is None:
-        names.append("telegram")
     unknown = [p for p in (platforms or []) if p not in source_map]
+    extra_gaps: list[str] = []
+    if managed is None and platforms and _needs_browser(platforms, source_map):
+        extra_gaps.append("browser[0] FAILED: no managed profile; run `net-sift install`")
 
     since_dt = core.parse_day(since) if since else datetime.now(timezone.utc) - timedelta(days=365)
     until_dt = core.parse_day(until) if until else datetime.now(timezone.utc)
 
-    records, logs = core.run(
-        query,
-        source_map,
-        names,
-        since_dt,
-        until_dt,
-        max_budget,
-        near_dup=near_dup,
-        do_rank=rank,
-        min_rel=min_rel,
+    # Browser-backed sources (walled + open web + telegram discovery) run inside one
+    # managed headless browser, opened once and killed at the end.
+    open_browser = managed is not None and _needs_browser(names, source_map)
+    cm = (
+        browser.managed_browser(managed[0], managed[1])
+        if open_browser
+        else contextlib.nullcontext(None)
     )
+    with cm as endpoint:
+        if endpoint:
+            opencli.set_endpoint(endpoint)
+        try:
+            wants_telegram = platforms is None or "telegram" in platforms
+            if not tg_channels and wants_telegram and "google" in source_map:
+                try:
+                    tg_channels = discover_telegram(query, source_map)
+                except Exception as e:  # a failed discovery is a declared gap
+                    extra_gaps.append(
+                        f"telegram[0] FAILED: channel discovery: {type(e).__name__}: {e}"
+                    )
+            if tg_channels:
+                source_map["telegram"] = lambda q, s, u, b: sources.src_telegram(
+                    q, s, u, b, tg_channels
+                )
+                if "telegram" not in names:
+                    names.append("telegram")
+            records, logs = core.run(
+                query,
+                source_map,
+                names,
+                since_dt,
+                until_dt,
+                max_budget,
+                near_dup=near_dup,
+                do_rank=rank,
+                min_rel=min_rel,
+            )
+        finally:
+            opencli.set_endpoint(None)
     params = {
         "platforms": names,
         "since": since,
@@ -114,8 +156,7 @@ def deep_search(
     }
     meta = sessions.save(query, params, records, logs)
     cov = _coverage(logs)
-    if tg_gap:
-        cov["gaps"].append(tg_gap)
+    cov["gaps"].extend(extra_gaps)
 
     return {
         "session_id": meta["id"],

@@ -29,6 +29,22 @@ def ensure_dirs() -> None:
     SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
 
 
+#: Which browser net-sift manages (its profile is copied and driven headless).
+_BROWSER_CHOICE = HOME / "browser.json"
+
+
+def get_browser_choice(home: Path) -> str | None:
+    try:
+        return json.loads((Path(home) / "browser.json").read_text(encoding="utf-8")).get("browser")
+    except (OSError, ValueError):
+        return None
+
+
+def set_browser_choice(home: Path, browser_id: str) -> None:
+    Path(home).mkdir(parents=True, exist_ok=True)
+    (Path(home) / "browser.json").write_text(json.dumps({"browser": browser_id}), encoding="utf-8")
+
+
 #: Optional provider keys for opt-in features. Read from the environment first,
 #: then a local secrets file the wizard writes. Never committed; never required.
 _SECRETS = HOME / "secrets.json"
