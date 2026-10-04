@@ -6,6 +6,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-10-04
+
+### Fixed
+
+- `context7` ignored a key saved by the wizard (it read only the environment) and
+  called the v3 search endpoint without `type=json`, so it returned plain text and
+  failed to parse. It now reads the saved key and parses the JSON code and info
+  snippets (verified live).
+
+### Changed
+
+- README refreshed: the web, news, video, reference, and keyed-provider sources, and
+  the `net-sift verify` and `net-sift login` commands, are now listed.
+
 ## [1.2.1] - 2026-10-04
 
 ### Fixed
@@ -269,7 +283,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Installer that registers the MCP server and status bar for Claude Code and Codex.
 - Test suite, Ruff linting, and GitHub Actions CI.
 
-[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v1.2.1...HEAD
+[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v1.2.2...HEAD
+[1.2.2]: https://github.com/ali-rajabpour/Net-Sift/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/ali-rajabpour/Net-Sift/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/ali-rajabpour/Net-Sift/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/ali-rajabpour/Net-Sift/compare/v1.0.0...v1.1.0

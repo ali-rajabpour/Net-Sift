@@ -51,6 +51,9 @@ def all_sources(with_browser: bool = False) -> dict[str, core.Source]:
     fc_key = config.get_secret("FIRECRAWL_API_KEY")
     if fc_key:
         merged["firecrawl"] = lambda q, s, u, b: sources.src_firecrawl(q, s, u, b, fc_key)
+    c7_key = config.get_secret("CONTEXT7_API_KEY")
+    if c7_key:
+        merged["context7"] = lambda q, s, u, b: sources.src_context7(q, s, u, b, c7_key)
     return merged
 
 

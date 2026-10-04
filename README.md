@@ -48,8 +48,11 @@ single search would under-serve the answer.
 - Many sources in one sweep, keyless by default (Bluesky, Hacker News, GitHub,
   arXiv, Polymarket, StockTwits, Mastodon, and more).
 - Walled platforms (Twitter/X, Reddit, Instagram, Facebook, Bilibili, Xiaohongshu,
-  Zhihu) and general web search, run headless from a copy of your logged-in
-  Chromium profile via OpenCLI, with the browser closed.
+  Zhihu) and general web search (Brave, DuckDuckGo, Google), run headless from a copy
+  of your logged-in Chromium profile via OpenCLI, with the browser closed.
+- News, video, long-form, reference, and archive sources: GDELT, Google News,
+  Reuters, YouTube, TikTok, Apple Podcasts, Substack, Medium, Stack Overflow,
+  Wikipedia, Wikidata, Internet Archive, and more.
 - Relevance ranking with head-entity grounding, CJK-aware tokenization, a recency
   boost, and engagement weighting.
 - A gap-closing driver that bisects the time window to recover tails a source
@@ -59,8 +62,9 @@ single search would under-serve the answer.
 - Context-lean by design: the agent receives summaries, coverage, gaps, and the
   top results, never the raw corpus.
 - Saved sessions you can continue later, deleted only on your confirmation.
-- Opt-in extras: dark-web discussion search (Tor, read-only and information-only)
-  and per-account Instagram recon (HikerAPI).
+- Opt-in keyed providers: Firecrawl search (reaches sites blocked locally, like
+  Google), Context7 code and library documentation, the Brave Search API, dark-web
+  discussion search (Tor), and per-account Instagram recon (HikerAPI).
 - A guided installer that copies your browser profile, logs you into any missing
   accounts one at a time, and adds a `[NET-SIFT]` status line.
 
@@ -121,6 +125,8 @@ macOS only for now; Windows and Linux are planned.
 
 ```bash
 net-sift doctor               # what can be reached right now
+net-sift verify               # live-check each walled and web source
+net-sift login reddit         # sign into a walled platform later
 net-sift search "topic" --platforms github,arxiv --max 50
 ```
 

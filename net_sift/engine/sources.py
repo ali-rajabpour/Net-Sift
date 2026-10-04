@@ -519,14 +519,23 @@ def src_marginalia(query, since, until, budget):
     return out, False
 
 
+def _c7_url(s: dict) -> str:
+    """A snippet's source URL. codeId/infoId are full URLs; libraryId is a /org/repo
+    path on context7.com."""
+    u = s.get("codeId") or s.get("infoId") or s.get("libraryId") or ""
+    return f"https://context7.com{u}" if u.startswith("/") else u
+
+
 def src_context7(query, since, until, budget, key=None):
     """Context7: up-to-date code and library documentation for a natural-language
-    query. Keyed (CONTEXT7_API_KEY); undated, so it never reports a ceiling."""
+    query. Keyed (CONTEXT7_API_KEY); undated, so it never reports a ceiling. The v3
+    search endpoint returns JSON only with ``type=json``; otherwise it is plain text."""
     key = key or os.environ.get("CONTEXT7_API_KEY")
     if not key:
         raise RuntimeError("CONTEXT7_API_KEY is not set")
     d = _json(
-        "https://context7.com/api/v3/search?" + urllib.parse.urlencode({"query": query}),
+        "https://context7.com/api/v3/search?"
+        + urllib.parse.urlencode({"query": query, "type": "json"}),
         {"Authorization": f"Bearer {key}", "Accept": "application/json"},
     )
     out: list[Record] = []
@@ -534,31 +543,16 @@ def src_context7(query, since, until, budget, key=None):
         if len(out) >= budget:
             break
         code = "\n".join(c.get("code", "") for c in s.get("codeList", []))
-        lib = s.get("libraryId", "")
-        out.append(
-            rec(
-                "context7",
-                f"{lib}:{s.get('codeTitle', '')}",
-                f"https://context7.com{lib}" if lib.startswith("/") else lib,
-                lib,
-                f"{s.get('codeTitle', '')}\n{code}",
-                None,
-            )
-        )
+        url = _c7_url(s)
+        title = s.get("codeTitle", "")
+        body = "\n".join(x for x in (title, s.get("codeDescription", ""), code) if x)
+        out.append(rec("context7", url or title, url, s.get("codeLanguage"), body, None))
     for s in d.get("infoSnippets", []):
         if len(out) >= budget:
             break
-        lib = s.get("libraryId", "")
-        out.append(
-            rec(
-                "context7",
-                f"{lib}:{abs(hash(s.get('content', ''))) % 10**10}",
-                f"https://context7.com{lib}" if lib.startswith("/") else lib,
-                lib,
-                s.get("content", ""),
-                None,
-            )
-        )
+        content = s.get("content") or s.get("infoDescription") or s.get("text") or ""
+        url = _c7_url(s)
+        out.append(rec("context7", url or (abs(hash(content)) % 10**12), url, None, content, None))
     return out[:budget], False
 
 
@@ -676,7 +670,6 @@ SOURCES = {
     "sogou_wechat": src_sogou_wechat,
     "gdelt": src_gdelt,
     "marginalia": src_marginalia,
-    "context7": src_context7,
 }
 
 DEFAULT_SOURCES = [
