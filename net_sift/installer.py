@@ -558,6 +558,21 @@ def _optional_features(ui: _UI) -> None:
         else:
             ui.info("No key entered; skipped. Rerun net-sift install to add it later.")
 
+    # Context7 code and library documentation search
+    if config.get_secret("CONTEXT7_API_KEY"):
+        ui.ok("Context7 documentation search: key already set.")
+    elif ui.confirm(
+        "Enable Context7 documentation search? It searches up-to-date code and library "
+        "docs. Needs an API key.",
+        default=False,
+    ):
+        k = ui.secret("Paste your Context7 API key (hidden)")
+        if k:
+            config.set_secret("CONTEXT7_API_KEY", k)
+            ui.ok("Saved. Context7 documentation search is enabled.")
+        else:
+            ui.info("No key entered; skipped. Rerun net-sift install to add it later.")
+
 
 def run(home: Path | None = None, assume_yes: bool = False) -> int:
     home = home or Path.home()

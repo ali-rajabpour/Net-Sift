@@ -6,6 +6,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-10-04
+
+### Fixed
+
+- `net-sift install` now prompts for a Context7 API key in the Optional features step,
+  like the HikerAPI and Firecrawl keys. The `context7` source was reachable only via
+  the environment before.
+
 ## [1.2.0] - 2026-10-04
 
 ### Added
@@ -261,7 +269,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Installer that registers the MCP server and status bar for Claude Code and Codex.
 - Test suite, Ruff linting, and GitHub Actions CI.
 
-[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/ali-rajabpour/Net-Sift/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/ali-rajabpour/Net-Sift/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/ali-rajabpour/Net-Sift/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/ali-rajabpour/Net-Sift/compare/v0.6.2...v1.0.0
