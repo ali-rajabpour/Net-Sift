@@ -23,6 +23,7 @@ OPTIONAL_ENV = {
     "BRAVE_API_KEY": "enables the keyed Brave Search API web source (brave_api)",
     "MARGINALIA_API_KEY": "personal Marginalia key; adds it to the default sweep",
     "CONTEXT7_API_KEY": "enables Context7 code and library documentation search",
+    "FIRECRAWL_API_KEY": "enables the Firecrawl search source (reaches sites blocked locally)",
 }
 
 

@@ -46,9 +46,15 @@ Record = dict[str, object]
 Source = Callable[[str, datetime | None, datetime | None, int], tuple[list[Record], bool]]
 
 
-def _get(url: str, headers: dict | None = None) -> bytes:
-    """Paced, retrying GET. Honors a per-host pace and backs off on transient errors."""
-    req = urllib.request.Request(url, headers={"User-Agent": UA, **(headers or {})})
+def _get(url: str, headers: dict | None = None, data: bytes | None = None) -> bytes:
+    """Paced, retrying GET, or POST when `data` is given. Honors a per-host pace and
+    backs off on transient errors."""
+    req = urllib.request.Request(
+        url,
+        data=data,
+        headers={"User-Agent": UA, **(headers or {})},
+        method="POST" if data else "GET",
+    )
     host = urllib.parse.urlsplit(url).hostname or ""
     pace = HOST_PACE.get(host, PACE)
     last: Exception | None = None
@@ -72,8 +78,8 @@ def _get(url: str, headers: dict | None = None) -> bytes:
     raise last
 
 
-def _json(url: str, headers: dict | None = None):
-    return json.loads(_get(url, headers))
+def _json(url: str, headers: dict | None = None, data: bytes | None = None):
+    return json.loads(_get(url, headers, data))
 
 
 def _get_quick(url: str, headers: dict | None = None, timeout: int = 12) -> bytes:

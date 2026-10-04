@@ -51,6 +51,7 @@ Sources marked *browser* need a connected Chromium session; the rest need only t
 |--------|----------------|----------|
 | `brave_api` | Brave Search API, for when there is no managed profile | `BRAVE_API_KEY`; metered, at most 10 requests and 200 results per sweep |
 | `context7` | up-to-date code and library documentation | `CONTEXT7_API_KEY` |
+| `firecrawl` | hosted search that reaches sites blocked locally (Google, Cloudflare-walled) | `FIRECRAWL_API_KEY`; metered; queries and URLs go to Firecrawl |
 | `marginalia` | independent index of the small, non-commercial web | `MARGINALIA_API_KEY` for the default sweep |
 
 ## Walled (login, through OpenCLI, opt-in by connectivity)
@@ -85,6 +86,7 @@ accounts are signed in.
 | `BRAVE_API_KEY` | enables the keyed `brave_api` source (keyless `brave` runs through the browser) |
 | `MARGINALIA_API_KEY` | personal Marginalia key; adds `marginalia` to the default sweep |
 | `CONTEXT7_API_KEY` | enables Context7 code and library documentation search |
+| `FIRECRAWL_API_KEY` | enables the Firecrawl search source (reaches sites blocked locally) |
 | `HIKERAPI_KEY` | enables Instagram account recon |
 | `NET_SIFT_HOME` | where sessions are stored (default `~/.net-sift`) |
 | `NET_SIFT_OPENCLI_BIN` | path to the `opencli` binary if not on `PATH` |

@@ -178,6 +178,34 @@ def test_context7_needs_key(monkeypatch):
         sources.src_context7("q", None, None, 10)
 
 
+def test_firecrawl_posts_and_parses(monkeypatch):
+    seen = {}
+
+    def fake_json(url, headers=None, data=None):
+        seen["url"] = url
+        seen["auth"] = headers.get("Authorization")
+        seen["body"] = json.loads(data)
+        return {
+            "success": True,
+            "data": {"web": [{"url": "https://e.org", "title": "t", "description": "d"}]},
+        }
+
+    monkeypatch.setattr(sources, "_json", fake_json)
+    recs, ceiling = sources.src_firecrawl("google blocked thing", SINCE, UNTIL, 2000, key="fc-k")
+    assert ceiling is False and recs[0]["source"] == "firecrawl"
+    assert recs[0]["url"] == "https://e.org" and "t\nd" == recs[0]["text"]
+    assert seen["url"] == "https://api.firecrawl.dev/v2/search"
+    assert seen["auth"] == "Bearer fc-k"
+    assert seen["body"]["query"] == "google blocked thing" and seen["body"]["limit"] == 100
+    assert "cd_min:09/01/2026" in seen["body"]["tbs"]
+
+
+def test_firecrawl_needs_key(monkeypatch):
+    monkeypatch.delenv("FIRECRAWL_API_KEY", raising=False)
+    with pytest.raises(RuntimeError):
+        sources.src_firecrawl("q", None, None, 10)
+
+
 def test_gdelt_ceiling_and_plain_text_error(monkeypatch):
     arts = [
         {"url": f"https://n.org/{i}", "title": "t", "seendate": "20260915T101500Z", "domain": "n"}

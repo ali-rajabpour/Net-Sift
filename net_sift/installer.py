@@ -543,6 +543,21 @@ def _optional_features(ui: _UI) -> None:
         else:
             ui.info("No key entered; skipped. Rerun net-sift install to add it later.")
 
+    # Firecrawl search (hosted; reaches sites blocked locally, e.g. Google)
+    if config.get_secret("FIRECRAWL_API_KEY"):
+        ui.ok("Firecrawl search: key already set.")
+    elif ui.confirm(
+        "Enable Firecrawl search? It reaches sites blocked locally (like Google) via a "
+        "hosted API; queries and URLs go to Firecrawl. Needs an API key.",
+        default=False,
+    ):
+        k = ui.secret("Paste your Firecrawl API key (hidden)")
+        if k:
+            config.set_secret("FIRECRAWL_API_KEY", k)
+            ui.ok("Saved. Firecrawl search is enabled.")
+        else:
+            ui.info("No key entered; skipped. Rerun net-sift install to add it later.")
+
 
 def run(home: Path | None = None, assume_yes: bool = False) -> int:
     home = home or Path.home()

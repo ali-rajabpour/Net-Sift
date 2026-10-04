@@ -6,6 +6,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-04
+
+### Added
+
+- `firecrawl`: optional, keyed search source (`FIRECRAWL_API_KEY`) that reaches sites
+  net-sift's own browser is blocked on, such as Google and Cloudflare-walled pages.
+  Off by default; queries and URLs go to Firecrawl's hosted API. Set up in
+  `net-sift install` like the HikerAPI key, or via the environment.
+- `_get`/`_json` in the engine now support POST bodies, for JSON search APIs.
+
 ## [1.1.0] - 2026-10-04
 
 ### Added
@@ -251,7 +261,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Installer that registers the MCP server and status bar for Claude Code and Codex.
 - Test suite, Ruff linting, and GitHub Actions CI.
 
-[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/ali-rajabpour/Net-Sift/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/ali-rajabpour/Net-Sift/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/ali-rajabpour/Net-Sift/compare/v0.6.2...v1.0.0
 [0.6.2]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.6.2

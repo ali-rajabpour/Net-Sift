@@ -562,6 +562,36 @@ def src_context7(query, since, until, budget, key=None):
     return out[:budget], False
 
 
+def src_firecrawl(query, since, until, budget, key=None):
+    """Firecrawl search API: a hosted crawler with stealth proxies that reaches
+    sites our own browser gets blocked on (Google, Cloudflare-walled pages). Keyed
+    (FIRECRAWL_API_KEY); metered; queries and URLs go to Firecrawl's servers."""
+    key = key or os.environ.get("FIRECRAWL_API_KEY")
+    if not key:
+        raise RuntimeError("FIRECRAWL_API_KEY is not set")
+    payload = {"query": query, "limit": min(budget, 100), "sources": ["web"]}
+    if since and until:
+        payload["tbs"] = f"cdr:1,cd_min:{since:%m/%d/%Y},cd_max:{until:%m/%d/%Y}"
+    d = _json(
+        "https://api.firecrawl.dev/v2/search",
+        {"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+        json.dumps(payload).encode(),
+    )
+    web = (d.get("data") or {}).get("web") or []
+    out = [
+        rec(
+            "firecrawl",
+            x.get("url"),
+            x.get("url"),
+            None,
+            f"{x.get('title') or ''}\n{x.get('description') or ''}",
+            None,
+        )
+        for x in web[:budget]
+    ]
+    return out, False
+
+
 BRAVE_PAGE = 20  # the API's maximum per request
 BRAVE_MAX_PAGES = 10  # offset stops at 9, so 200 results is the whole reach
 

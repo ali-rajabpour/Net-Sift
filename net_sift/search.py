@@ -48,6 +48,9 @@ def all_sources(with_browser: bool = False) -> dict[str, core.Source]:
     brave_key = config.get_secret("BRAVE_API_KEY")
     if brave_key:
         merged["brave_api"] = lambda q, s, u, b: sources.src_brave(q, s, u, b, brave_key)
+    fc_key = config.get_secret("FIRECRAWL_API_KEY")
+    if fc_key:
+        merged["firecrawl"] = lambda q, s, u, b: sources.src_firecrawl(q, s, u, b, fc_key)
     return merged
 
 
@@ -57,7 +60,7 @@ def default_names(source_map: dict[str, core.Source]) -> list[str]:
         names.append("marginalia")
     if config.get_secret("CONTEXT7_API_KEY"):
         names.append("context7")
-    live = (*opencli.WALLED_SITES, *opencli.OPEN_SEARCH, "brave_api")
+    live = (*opencli.WALLED_SITES, *opencli.OPEN_SEARCH, "brave_api", "firecrawl")
     return names + [s for s in live if s in source_map]
 
 

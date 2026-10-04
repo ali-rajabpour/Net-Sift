@@ -163,6 +163,10 @@ that honestly and moves on rather than looping.
   locations, top engagers, followers, and shared-follower intersection via
   HikerAPI. Metered and opt-in; the wizard stores your key at
   `~/.net-sift/secrets.json` (0600), or set `HIKERAPI_KEY` in the environment.
+- **Firecrawl search** (`firecrawl`): a hosted search that reaches sites blocked
+  locally (Google, Cloudflare-walled pages). Opt-in and keyed; queries and URLs go
+  to Firecrawl's servers, so it is off by default. The wizard stores your key at
+  `~/.net-sift/secrets.json` (0600), or set `FIRECRAWL_API_KEY`.
 
 ## Sources
 
@@ -191,6 +195,7 @@ browser profile exists.
 | `BRAVE_API_KEY` | enables the keyed `brave_api` source (keyless `brave` runs through the browser) |
 | `MARGINALIA_API_KEY` | personal Marginalia key; adds `marginalia` to the default sweep |
 | `CONTEXT7_API_KEY` | enables Context7 code and library documentation search |
+| `FIRECRAWL_API_KEY` | enables the Firecrawl search source (reaches sites blocked locally) |
 | `HIKERAPI_KEY` | enables Instagram account recon |
 | `NET_SIFT_HOME` | session storage location (default `~/.net-sift`) |
 | `NET_SIFT_OPENCLI_BIN` | path to the `opencli` binary if not on `PATH` |
