@@ -24,6 +24,19 @@ def _cmd_install(args) -> int:
     return installer.run(Path.home(), assume_yes=args.yes)
 
 
+def _cmd_login(args) -> int:
+    from .access import opencli
+
+    sites = args.sites.split(",") if args.sites else list(opencli.WALLED_SITES)
+    sites = [s for s in sites if s in installer.LOGIN_URLS]
+    if not sites:
+        print("No known sites to log into.")
+        return 1
+    ui = installer._UI(assume_yes=False)
+    res = installer.login_sites(Path.home(), sites, ui)
+    return 0 if any(res.values()) else 1
+
+
 def _cmd_serve(args) -> int:
     from .mcp_server import main as serve
 
@@ -65,6 +78,10 @@ def main(argv: list | None = None) -> int:
         "--yes", action="store_true", help="unattended: accept installs, skip human-only steps"
     )
     i.set_defaults(func=_cmd_install)
+
+    lg = sub.add_parser("login", help="log into walled platforms in the managed browser")
+    lg.add_argument("sites", nargs="?", help="comma-separated site ids (default: all walled)")
+    lg.set_defaults(func=_cmd_login)
 
     sub.add_parser("serve", help="run the MCP server (stdio)").set_defaults(func=_cmd_serve)
 

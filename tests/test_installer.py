@@ -16,21 +16,6 @@ def test_node_ok():
     assert installer.node_ok("v20.18.0") is False
 
 
-def test_detect_browsers_linux(monkeypatch):
-    present = {"google-chrome": "/usr/bin/google-chrome", "brave-browser": "/usr/bin/brave-browser"}
-    monkeypatch.setattr(installer.shutil, "which", lambda b: present.get(b))
-    found = installer.detect_chromium_browsers(system="Linux")
-    names = [b["name"] for b in found]
-    assert "Google Chrome" in names and "Brave" in names
-    assert all("open" in b and b["open"] for b in found)
-
-
-def test_browser_choice_roundtrip(tmp_path):
-    choice = {"name": "Comet", "open": ["open", "-a", "/Applications/Comet.app"]}
-    installer.save_browser_choice(tmp_path, choice)
-    assert installer.load_browser_choice(tmp_path) == choice
-
-
 def test_compose_statusline_no_existing(tmp_path):
     p = tmp_path / "settings.json"
     ui = installer._UI(assume_yes=True)
@@ -66,19 +51,23 @@ def test_detect_clients(tmp_path, monkeypatch):
 
 
 def test_run_wizard_all_present(tmp_path, monkeypatch, capsys):
-    # everything already installed and connected -> wizard completes, no npm/brew calls
+    # everything already installed; one browser detected and copied -> wizard completes
     monkeypatch.setattr(installer.shutil, "which", lambda name: f"/usr/bin/{name}")
     monkeypatch.setattr(installer, "_run", lambda cmd, timeout=300: (0, "v26.9.0"))
-    from net_sift.access import opencli
-
-    monkeypatch.setattr(opencli, "available", lambda: True)
-    monkeypatch.setattr(opencli, "probe_detail", lambda site, timeout=60: (True, "ok"))
+    monkeypatch.setattr(
+        installer.browsers,
+        "detect",
+        lambda: {
+            "comet": {"id": "comet", "name": "Comet", "executable": "/x", "source_profile": "/s"}
+        },
+    )
+    monkeypatch.setattr(installer.profile, "logged_in", lambda p: {"twitter": True, "reddit": True})
+    monkeypatch.setattr(installer.profile, "copy_profile", lambda src, dst: dst)
     (tmp_path / ".claude.json").write_text("{}")
     rc = installer.run(tmp_path, assume_yes=True)
     out = capsys.readouterr().out
     assert rc == 0
     assert "Node v26.9.0 present" in out
     assert "OpenCLI already installed" in out
-    assert "Browser connected" in out
-    assert "Reddit: connected" in out
+    assert "Copied Comet" in out
     assert "net-sift is installed" in out

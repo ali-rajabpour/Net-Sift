@@ -1,5 +1,4 @@
 from net_sift import config, status
-from net_sift.access import opencli
 
 
 def test_secret_env_precedence(tmp_path, monkeypatch):
@@ -13,11 +12,24 @@ def test_secret_env_precedence(tmp_path, monkeypatch):
     assert config.get_secret("HIKERAPI_KEY") == "from-env"  # env wins
 
 
-def test_status_badge(monkeypatch):
-    monkeypatch.setattr(opencli, "available_cached", lambda ttl=60: True)
+def test_status_badge_ready(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "HOME", tmp_path)
+    monkeypatch.setattr(status.config, "get_browser_choice", lambda home: "comet")
+    md = tmp_path / "profiles" / "comet"
+    md.mkdir(parents=True)
+    monkeypatch.setattr(status.profile, "logged_in", lambda p: {"twitter": True, "reddit": False})
     line = status.line()
     assert "[NET-SIFT]" in line
     assert "web sources ready" in line
+    assert "1 accounts" in line
+
+
+def test_status_badge_no_profile(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "HOME", tmp_path)
+    monkeypatch.setattr(status.config, "get_browser_choice", lambda home: None)
+    line = status.line()
+    assert "[NET-SIFT]" in line
+    assert "no profile" in line
 
 
 def test_secret_file_is_0600(tmp_path, monkeypatch):

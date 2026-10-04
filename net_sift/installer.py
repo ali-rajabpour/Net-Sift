@@ -15,47 +15,18 @@ such as browser login, are reported as skipped instead of blocking).
 from __future__ import annotations
 
 import json
-import os
-import platform
 import shutil
 import subprocess
+import time
+import urllib.request
 from pathlib import Path
 
 from . import config
+from .access import browser, browsers, profile
 
 MCP_ENTRY = {"command": "net-sift", "args": ["serve"]}
 NODE_MIN = (20, 18, 1)
 OPENCLI_NPM = "@jackwener/opencli"
-OPENCLI_EXTENSION_URL = (
-    "https://chromewebstore.google.com/detail/opencli/ildkmabpimmkaediidaifkhjpohdnifk"
-)
-
-# Chromium-family browsers that can load the OpenCLI extension, per OS.
-_MAC_BROWSERS = [
-    ("Google Chrome", "Google Chrome.app"),
-    ("Comet", "Comet.app"),
-    ("Brave", "Brave Browser.app"),
-    ("Microsoft Edge", "Microsoft Edge.app"),
-    ("Arc", "Arc.app"),
-    ("Vivaldi", "Vivaldi.app"),
-    ("Opera", "Opera.app"),
-    ("Chromium", "Chromium.app"),
-]
-_WIN_BROWSERS = [
-    ("Google Chrome", "Google/Chrome/Application/chrome.exe"),
-    ("Microsoft Edge", "Microsoft/Edge/Application/msedge.exe"),
-    ("Brave", "BraveSoftware/Brave-Browser/Application/brave.exe"),
-    ("Vivaldi", "Vivaldi/Application/vivaldi.exe"),
-    ("Opera", "Programs/Opera/launcher.exe"),
-    ("Comet", "Comet/Application/comet.exe"),
-]
-_LINUX_BROWSERS = [
-    ("Google Chrome", "google-chrome"),
-    ("Chromium", "chromium"),
-    ("Brave", "brave-browser"),
-    ("Microsoft Edge", "microsoft-edge"),
-    ("Vivaldi", "vivaldi"),
-]
 
 
 # --- pure helpers (tested) ------------------------------------------------
@@ -194,59 +165,6 @@ def detect_clients(home: Path) -> dict[str, bool]:
     }
 
 
-def detect_chromium_browsers(system: str | None = None, home: Path | None = None) -> list[dict]:
-    """Installed Chromium-family browsers. Each entry: {name, open} where `open`
-    is the argv prefix to launch a URL (the URL is appended). Cross-platform."""
-    system = system or platform.system()
-    home = home or Path.home()
-    found: list[dict] = []
-    if system == "Darwin":
-        roots = [Path("/Applications"), home / "Applications"]
-        for name, app in _MAC_BROWSERS:
-            for d in roots:
-                if (d / app).exists():
-                    found.append({"name": name, "open": ["open", "-a", str(d / app)]})
-                    break
-    elif system == "Windows":
-        roots = [
-            os.environ.get("PROGRAMFILES", r"C:\Program Files"),
-            os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)"),
-            os.environ.get("LOCALAPPDATA", str(home / "AppData" / "Local")),
-        ]
-        for name, rel in _WIN_BROWSERS:
-            for root in filter(None, roots):
-                exe = Path(root) / rel
-                if exe.exists():
-                    found.append({"name": name, "open": [str(exe)]})
-                    break
-    else:  # Linux and the rest
-        for name, binname in _LINUX_BROWSERS:
-            path = shutil.which(binname)
-            if path:
-                found.append({"name": name, "open": [path]})
-    return found
-
-
-def _browser_choice_path(home: Path) -> Path:
-    return _nsift_dir(home) / "browser.json"
-
-
-def load_browser_choice(home: Path) -> dict | None:
-    try:
-        return json.loads(_browser_choice_path(home).read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-
-
-def save_browser_choice(home: Path, choice: dict) -> None:
-    p = _browser_choice_path(home)
-    try:
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(json.dumps(choice), encoding="utf-8")
-    except OSError:
-        pass
-
-
 # --- interactive runner ---------------------------------------------------
 
 
@@ -326,39 +244,68 @@ def _run(cmd: list[str], timeout: int = 300) -> tuple[int, str]:
         return 1, str(e)
 
 
-def _open_url(url: str, browser: dict | None = None) -> None:
-    if browser and browser.get("open"):
-        argv = [*browser["open"], url]
-    else:
-        argv = {"Darwin": ["open"], "Windows": ["cmd", "/c", "start", ""]}.get(
-            platform.system(), ["xdg-open"]
-        ) + [url]
+#: Login pages for the walled platforms, used by the sequential login flow.
+LOGIN_URLS = {
+    "twitter": "https://x.com/login",
+    "reddit": "https://www.reddit.com/login",
+    "instagram": "https://www.instagram.com/accounts/login/",
+    "facebook": "https://www.facebook.com/login",
+    "bilibili": "https://passport.bilibili.com/login",
+    "xiaohongshu": "https://www.xiaohongshu.com",
+    "zhihu": "https://www.zhihu.com/signin",
+    "weibo": "https://weibo.com/login.php",
+}
+
+
+def _navigate(endpoint: str, url: str) -> None:
+    """Open `url` in a new tab of the managed browser via the CDP HTTP endpoint, so
+    a second login reuses the same window instead of spawning another."""
+    req = urllib.request.Request(f"{endpoint}/json/new?{url}", method="PUT")
     try:
-        subprocess.Popen(argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        urllib.request.urlopen(req, timeout=10)
     except Exception:
         pass
 
 
-def _choose_browser(ui: _UI, home: Path) -> dict | None:
-    """Detect Chromium browsers; if several, let the user pick which one net-sift
-    opens login/extension pages in. The choice is remembered."""
-    browsers = detect_chromium_browsers(home=home)
-    if not browsers:
-        ui.warn("No Chromium browser found (Chrome, Edge, Brave, Arc, Comet). Account search")
-        ui.warn("needs one. Install any Chromium browser, then rerun net-sift install.")
+def _managed(home: Path) -> tuple[str, str] | None:
+    """(executable, managed profile dir) for the chosen browser, or None."""
+    base = _nsift_dir(home)
+    bid = config.get_browser_choice(base)
+    if not bid:
         return None
-    if len(browsers) == 1:
-        ui.ok(f"Using {browsers[0]['name']} for logins")
-        choice = browsers[0]
-    else:
-        idx = ui.choose(
-            "Several Chromium browsers found. Which should net-sift use for logins?",
-            [b["name"] for b in browsers],
-        )
-        choice = browsers[idx]
-        ui.ok(f"Using {choice['name']}")
-    save_browser_choice(home, choice)
-    return choice
+    found = browsers.detect().get(bid)
+    if not found:
+        return None
+    return found["executable"], str(profile.managed_dir(base, bid))
+
+
+def login_sites(home: Path, sites: list[str], ui: _UI, poll: int = 60, interval: int = 3) -> dict:
+    """Open the managed profile headed and log into each site in turn, reusing one
+    window. Success is detected from the site's auth cookie appearing. Interactive;
+    returns {site: logged_in}."""
+    mp = _managed(home)
+    if not mp:
+        ui.warn("No managed browser profile yet. Run `net-sift install` first.")
+        return {s: False for s in sites}
+    exe, pdir = mp
+    results: dict[str, bool] = {}
+    with browser.managed_browser(exe, pdir, headed=True) as endpoint:
+        for site in sites:
+            url = LOGIN_URLS.get(site)
+            if not url:
+                results[site] = False
+                continue
+            ui.info(f"Opening {site} login. Sign in; net-sift detects when you are done.")
+            _navigate(endpoint, url)
+            ok = False
+            for _ in range(poll):
+                if profile.logged_in(pdir).get(site):
+                    ok = True
+                    break
+                time.sleep(interval)
+            results[site] = ok
+            ui.ok(f"{site}: logged in") if ok else ui.warn(f"{site}: not detected, skipped")
+    return results
 
 
 def _setup_clients(ui: _UI, home: Path) -> None:
@@ -436,81 +383,52 @@ def _ensure_opencli(ui: _UI) -> bool:
             return False
 
 
-def _connect_bridge(ui: _UI, browser: dict | None) -> bool:
-    """Make sure OpenCLI's browser bridge is connected (daemon + extension)."""
+def setup_browser(ui: _UI, home: Path) -> None:
+    """Pick a Chromium browser, copy its profile into net-sift's managed area, and
+    offer to log into any walled site not already signed in. Sessions the user
+    already has are reused with no re-login; the user's real browser is untouched."""
     from .access import opencli
 
-    ui.step("Connect your browser")
-    ui.info("Starting OpenCLI and checking your browser...")
-    if opencli.available():  # runs `opencli doctor`, which starts the daemon
-        ui.ok("Browser connected")
-        return True
-    bname = browser["name"] if browser else "your Chromium browser"
-    ui.info(f"net-sift reads sites you are logged into through {bname}.")
-    ui.info("One-time step: install the OpenCLI Browser Bridge extension, either one:")
-    ui.info(f"   - Chrome Web Store: {OPENCLI_EXTENSION_URL}")
-    ui.info("   - or the opencli-extension zip from")
-    ui.info("     https://github.com/jackwener/opencli/releases (unzip, open the browser's")
-    ui.info("     extensions page, turn on Developer mode, click Load unpacked).")
-    if ui.confirm(f"Open the extension page in {bname} now?"):
-        _open_url(OPENCLI_EXTENSION_URL, browser)
-    while True:
-        if not ui.pause(f"Press Enter once the extension is installed and {bname} is open"):
-            ui.warn("Skipping account setup. Rerun net-sift install any time.")
-            return False
-        ui.info("Checking (takes a few seconds)...")
-        if opencli.available():
-            ui.ok("Browser connected")
-            return True
-        if not ui.confirm("Still not connected. Check again?", default=True):
-            return False
+    ui.step("Browser and accounts")
+    found = browsers.detect()
+    if not found:
+        ui.warn("No Chromium browser found (Chrome, Comet, Brave, Edge, Arc). Account and")
+        ui.warn("web search need one. Install any Chromium browser, then rerun net-sift install.")
+        return
 
+    # Show each browser with the sites it is already logged into, best first.
+    ranked = sorted(
+        found.values(),
+        key=lambda b: sum(profile.logged_in(b["source_profile"]).values()),
+        reverse=True,
+    )
+    for b in ranked:
+        sites = [s for s, on in profile.logged_in(b["source_profile"]).items() if on]
+        ui.info(f"{b['name']}: logged into {', '.join(sites) if sites else 'nothing detected'}")
+    choice = ranked[ui.choose("Which browser should net-sift use?", [b["name"] for b in ranked])]
 
-def _connect_accounts(ui: _UI, browser: dict | None) -> None:
-    """Check each account one by one. Never auto-skip: for any account that is not
-    connected, ask the user whether to connect it, and on yes give instructions."""
-    from .access import opencli
+    ui.info("net-sift copies that browser's profile so it can search with the browser closed.")
+    ui.info("The copy holds your session cookies and stays on this machine (0700).")
+    if not ui.confirm(f"Copy the {choice['name']} profile now?"):
+        ui.warn("Skipped. Walled and web sources will be unavailable until you do this.")
+        return
+    base = _nsift_dir(home)
+    dest = str(profile.managed_dir(base, choice["id"]))
+    profile.copy_profile(choice["source_profile"], dest)
+    config.set_browser_choice(base, choice["id"])
+    ui.ok(f"Copied {choice['name']} into {dest}")
 
-    bname = browser["name"] if browser else "your browser"
-    ui.step("Your accounts")
-    ui.info("Checking each account you can search. This opens your browser briefly per site.")
-    for site in opencli.WALLED_SITES:
-        name, url = opencli.WALLED_META[site]
-        ui.info(f"Checking {name}...")
-        ok, reason = opencli.probe_detail(site)
-        if ok:
-            ui.ok(f"{name}: connected")
-            continue
-        if reason == "blocked":
-            ui.info(f"{name}: OpenCLI could not open it (the site may block automation, or its")
-            ui.info("adapter may be down). Logging in might not help, but you can try.")
-            question = f"Try to connect {name} anyway?"
-        else:
-            question = f"{name} is not connected. Connect it now?"
-        if not ui.confirm(question, default=True):
-            ui.info(f"{name}: skipped")
-            continue
-        ui.info(f"Opening {name} in {bname}: {url}")
-        ui.info("Sign in as normal, then come back here.")
-        _open_url(url, browser)
-        # User-driven: verify, and only retry when the user says so (no auto loop).
-        while True:
-            if not ui.pause(f"Press Enter once you are logged into {name}"):
-                ui.info(f"{name}: skipped")
-                break
-            ui.info("Verifying...")
-            ok2, reason2 = opencli.probe_detail(site)
-            if ok2:
-                ui.ok(f"{name}: connected")
-                break
-            hint = (
-                "the site is blocking automation, not your login"
-                if reason2 == "blocked"
-                else "make sure you are fully logged in and the tab is open"
-            )
-            if not ui.confirm(f"{name} still not working ({hint}). Try again?", default=False):
-                ui.info(f"{name}: skipped")
-                break
+    state = profile.logged_in(dest)
+    missing = [s for s in opencli.WALLED_SITES if s in LOGIN_URLS and not state.get(s)]
+    if not missing:
+        ui.ok("All supported accounts are already signed in.")
+        return
+    ui.info(f"Not signed in: {', '.join(missing)}.")
+    if ui.assume_yes:
+        ui.info("Unattended run; add them later with `net-sift login <site>`.")
+        return
+    if ui.confirm("Log into them now (one at a time, in a browser window net-sift opens)?"):
+        login_sites(home, missing, ui)
 
 
 def _optional_features(ui: _UI) -> None:
@@ -555,14 +473,13 @@ def run(home: Path | None = None, assume_yes: bool = False) -> int:
     print("=" * 40)
     _setup_clients(ui, home)
     if _ensure_node(ui) and _ensure_opencli(ui):
-        browser = _choose_browser(ui, home)
-        if _connect_bridge(ui, browser):
-            _connect_accounts(ui, browser)
+        setup_browser(ui, home)
     _optional_features(ui)
 
     ui.step("Done")
     ui.info("net-sift is installed. Keyless sources (Bluesky, Hacker News, GitHub, arXiv,")
-    ui.info("and more) always work. The accounts you connected above are searchable too.")
-    ui.info("Run `net-sift doctor` any time to see what is connected.")
+    ui.info("and more) always work. Walled and web sources run headless from the copied")
+    ui.info("profile, with the browser closed. Run `net-sift doctor` to see what is signed in,")
+    ui.info("or `net-sift login <site>` to add an account later.")
     print("\nRestart your client so it picks up net-sift.")
     return 0
