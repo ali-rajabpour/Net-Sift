@@ -40,12 +40,15 @@ browser it came from.
 
 ## 4. Verify
 
+`net-sift install` finishes by live-checking every walled and web source and telling
+you which connect. Re-run that check any time:
+
 ```bash
-net-sift doctor
+net-sift verify     # live: runs each source once from the copied profile
+net-sift doctor     # offline: chosen browser, profile readiness, accounts signed in
 ```
 
-It shows the chosen browser, whether the managed profile is ready, and which accounts
-are signed in. The status bar (after `net-sift install`) shows the same at a glance.
+The status bar (after `net-sift install`) shows readiness at a glance.
 
 ## Notes
 

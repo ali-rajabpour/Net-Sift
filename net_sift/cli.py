@@ -37,6 +37,15 @@ def _cmd_login(args) -> int:
     return 0 if any(res.values()) else 1
 
 
+def _cmd_verify(args) -> int:
+    ui = installer._UI(assume_yes=False)
+    res = installer.verify_sources(Path.home(), ui)
+    if not res:
+        print("No managed browser profile. Run `net-sift install` first.")
+        return 1
+    return 0 if any(st == "ok" for st, _ in res.values()) else 1
+
+
 def _cmd_serve(args) -> int:
     from .mcp_server import main as serve
 
@@ -82,6 +91,10 @@ def main(argv: list | None = None) -> int:
     lg = sub.add_parser("login", help="log into walled platforms in the managed browser")
     lg.add_argument("sites", nargs="?", help="comma-separated site ids (default: all walled)")
     lg.set_defaults(func=_cmd_login)
+
+    sub.add_parser(
+        "verify", help="live-check each walled and web source through the managed profile"
+    ).set_defaults(func=_cmd_verify)
 
     sub.add_parser("serve", help="run the MCP server (stdio)").set_defaults(func=_cmd_serve)
 

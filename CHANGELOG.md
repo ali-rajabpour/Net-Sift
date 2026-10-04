@@ -18,6 +18,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   signed into, copies the one you choose into `~/.net-sift/profiles/<id>/` (0700),
   and offers to log into any missing walled site, one at a time.
 - `net-sift login [sites]`: open the managed profile and sign into walled platforms.
+- `net-sift install` ends with a live source check: it runs every walled and web
+  source once from the copied profile, reports which connect and which do not, and
+  offers to log into the ones a login can fix. Also available as `net-sift verify`.
 - Session detection by cookie name (no values decrypted) in `doctor` and `status`.
 - General web search: `google` through the managed browser, and `brave` through
   the Brave Search API when `BRAVE_API_KEY` is set (capped at 10 requests and 200

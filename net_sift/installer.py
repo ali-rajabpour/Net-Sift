@@ -22,7 +22,7 @@ import urllib.request
 from pathlib import Path
 
 from . import config
-from .access import browser, browsers, profile
+from .access import browser, browsers, opencli, profile
 
 MCP_ENTRY = {"command": "net-sift", "args": ["serve"]}
 NODE_MIN = (20, 18, 1)
@@ -256,6 +256,81 @@ LOGIN_URLS = {
 }
 
 
+#: Sites whose adapters read better with a Chinese probe query.
+_ZH_SITES = {"weixin", "tieba", "bilibili", "xiaohongshu", "zhihu"}
+
+
+def _classify(err: str) -> str:
+    low = err.lower()
+    if "auth_required" in low or "not logged in" in low or "login" in low:
+        return "login"
+    if "timeout" in low or "timed out" in low:
+        return "timeout"
+    if "navigation rejected" in low or "command_exec" in low or "pre-navigation" in low:
+        return "blocked"
+    return "error"
+
+
+def verify_sources(home: Path, ui: _UI) -> dict:
+    """Live-check every browser-backed source through the managed profile: open the
+    headless browser once, run each source, report connected or not, and offer to log
+    into the ones a login could fix. Returns {name: ("ok"|"fail", detail)}."""
+    mp = _managed(home)
+    if not mp:
+        return {}
+    exe, pdir = mp
+    ui.step("Checking sources")
+    ui.info("Running each walled and web source once from the copied profile...")
+    results: dict[str, tuple] = {}
+    targets = [
+        (name, opencli.make_source(site, cmd, name, cap), "新闻" if name in _ZH_SITES else "news")
+        for name, (site, cmd, cap, _) in opencli.OPEN_SEARCH.items()
+    ]
+    targets += [
+        (s, opencli.make_source(s, "search"), "新闻" if s in _ZH_SITES else "news")
+        for s in opencli.WALLED_SITES
+    ]
+    with browser.managed_browser(exe, pdir) as endpoint:
+        opencli.set_endpoint(endpoint)
+        try:
+            for name, fn, q in targets:
+                try:
+                    recs, _ = fn(q, None, None, 3)
+                    results[name] = ("ok", len(recs))
+                    if recs:
+                        ui.ok(f"{name}: connected ({len(recs)})")
+                    else:
+                        ui.info(f"{name}: reachable, no sample results")
+                except Exception as e:
+                    reason = _classify(str(e))
+                    results[name] = ("fail", reason)
+                    ui.warn(f"{name}: not connected ({reason})")
+        finally:
+            opencli.set_endpoint(None)
+
+    if ui.assume_yes:
+        return results
+    fixable = [
+        n
+        for n, (st, info) in results.items()
+        if st == "fail" and info == "login" and n in LOGIN_URLS
+    ]
+    if fixable:
+        ui.info(f"These may work after logging in: {', '.join(fixable)}.")
+        to_login = [n for n in fixable if ui.confirm(f"Log into {n} now?", default=False)]
+        if to_login:
+            login_sites(home, to_login, ui)
+    blocked = [
+        n for n, (st, info) in results.items() if st == "fail" and info in ("blocked", "timeout")
+    ]
+    if blocked:
+        ui.info(
+            f"Blocked by the site or flaky, so a login will not help: {', '.join(blocked)}. "
+            "net-sift reports these as gaps and moves on."
+        )
+    return results
+
+
 def _navigate(endpoint: str, url: str) -> None:
     """Open `url` in a new tab of the managed browser via the CDP HTTP endpoint, so
     a second login reuses the same window instead of spawning another."""
@@ -386,8 +461,6 @@ def setup_browser(ui: _UI, home: Path) -> None:
     """Pick a Chromium browser, copy its profile into net-sift's managed area, and
     offer to log into any walled site not already signed in. Sessions the user
     already has are reused with no re-login; the user's real browser is untouched."""
-    from .access import opencli
-
     ui.step("Browser and accounts")
     found = browsers.detect()
     if not found:
@@ -473,6 +546,10 @@ def run(home: Path | None = None, assume_yes: bool = False) -> int:
     _setup_clients(ui, home)
     if _ensure_node(ui) and _ensure_opencli(ui):
         setup_browser(ui, home)
+        # Live source check at the end of setup; skipped unattended (it drives a
+        # browser and prompts per failing site).
+        if _managed(home) and not ui.assume_yes:
+            verify_sources(ui=ui, home=home)
     _optional_features(ui)
 
     ui.step("Done")
