@@ -43,17 +43,21 @@ def all_sources(with_browser: bool = False) -> dict[str, core.Source]:
     if with_browser:
         merged.update(opencli.walled_sources(connected=True))
         merged.update(opencli.open_sources(connected=True))
-    key = config.get_secret("BRAVE_API_KEY")
-    if key:
-        merged["brave"] = lambda q, s, u, b: sources.src_brave(q, s, u, b, key)
+    # Keyless `brave` comes from the browser (OPEN_SEARCH). The Brave Search API is a
+    # separate keyed path, `brave_api`, for when there is no managed profile.
+    brave_key = config.get_secret("BRAVE_API_KEY")
+    if brave_key:
+        merged["brave_api"] = lambda q, s, u, b: sources.src_brave(q, s, u, b, brave_key)
     return merged
 
 
 def default_names(source_map: dict[str, core.Source]) -> list[str]:
     names = list(sources.DEFAULT_SOURCES)
-    if os.environ.get("MARGINALIA_API_KEY"):
+    if config.get_secret("MARGINALIA_API_KEY"):
         names.append("marginalia")
-    live = (*opencli.WALLED_SITES, *opencli.OPEN_SEARCH, "brave")
+    if config.get_secret("CONTEXT7_API_KEY"):
+        names.append("context7")
+    live = (*opencli.WALLED_SITES, *opencli.OPEN_SEARCH, "brave_api")
     return names + [s for s in live if s in source_map]
 
 

@@ -52,6 +52,8 @@ WALLED_SITES = tuple(WALLED_SEARCH)
 # ponytail: one page per query, no offset paging; add paging if depth matters.
 OPEN_SEARCH = {
     "google": ("google", "search", 10, True),
+    "brave": ("brave", "search", 18, True),
+    "duckduckgo": ("duckduckgo", "search", 10, True),
     "google_news": ("google", "news", 50, False),
     "reuters": ("reuters", "search", 40, True),
     "youtube": ("youtube", "search", 50, True),

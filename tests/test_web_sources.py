@@ -148,6 +148,36 @@ def test_brave_needs_key(monkeypatch):
         sources.src_brave("q", None, None, 10)
 
 
+def test_brave_and_ddg_are_browser_sources():
+    assert opencli.OPEN_SEARCH["brave"] == ("brave", "search", 18, True)
+    assert opencli.OPEN_SEARCH["duckduckgo"] == ("duckduckgo", "search", 10, True)
+
+
+def test_context7_parses_snippets(monkeypatch):
+    payload = {
+        "codeSnippets": [
+            {
+                "libraryId": "/vercel/next.js",
+                "codeTitle": "stream",
+                "codeList": [{"code": "await x"}],
+            }
+        ],
+        "infoSnippets": [{"libraryId": "/openai/openai", "content": "Use the SDK"}],
+    }
+    monkeypatch.setattr(sources, "_json", lambda url, headers=None: payload)
+    recs, ceiling = sources.src_context7("stream openai", None, None, 10, key="k")
+    assert ceiling is False and len(recs) == 2
+    assert recs[0]["source"] == "context7"
+    assert "await x" in recs[0]["text"]
+    assert recs[0]["url"] == "https://context7.com/vercel/next.js"
+
+
+def test_context7_needs_key(monkeypatch):
+    monkeypatch.delenv("CONTEXT7_API_KEY", raising=False)
+    with pytest.raises(RuntimeError):
+        sources.src_context7("q", None, None, 10)
+
+
 def test_gdelt_ceiling_and_plain_text_error(monkeypatch):
     arts = [
         {"url": f"https://n.org/{i}", "title": "t", "seendate": "20260915T101500Z", "domain": "n"}

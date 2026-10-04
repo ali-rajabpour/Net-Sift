@@ -6,6 +6,23 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-04
+
+### Added
+
+- `brave` and `duckduckgo`: keyless general web search through the managed headless
+  browser. Both are independent of Google and are not CAPTCHA-blocked the way Google
+  web search is, so they are the reliable general-web sources.
+- `context7`: up-to-date code and library documentation search (keyed,
+  `CONTEXT7_API_KEY`).
+
+### Changed
+
+- The keyed Brave Search API source is now `brave_api` (used when there is no managed
+  profile); keyless `brave` runs through the browser.
+- The install-time source check now classifies Google's CAPTCHA block as "blocked"
+  rather than a bare error, and does not offer a pointless login for it.
+
 ## [1.0.0] - 2026-10-04
 
 ### Added
@@ -234,7 +251,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Installer that registers the MCP server and status bar for Claude Code and Codex.
 - Test suite, Ruff linting, and GitHub Actions CI.
 
-[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/ali-rajabpour/Net-Sift/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/ali-rajabpour/Net-Sift/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/ali-rajabpour/Net-Sift/compare/v0.6.2...v1.0.0
 [0.6.2]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.6.2
 [0.6.1]: https://github.com/ali-rajabpour/Net-Sift/releases/tag/v0.6.1

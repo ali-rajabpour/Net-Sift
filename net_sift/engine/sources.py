@@ -519,6 +519,49 @@ def src_marginalia(query, since, until, budget):
     return out, False
 
 
+def src_context7(query, since, until, budget, key=None):
+    """Context7: up-to-date code and library documentation for a natural-language
+    query. Keyed (CONTEXT7_API_KEY); undated, so it never reports a ceiling."""
+    key = key or os.environ.get("CONTEXT7_API_KEY")
+    if not key:
+        raise RuntimeError("CONTEXT7_API_KEY is not set")
+    d = _json(
+        "https://context7.com/api/v3/search?" + urllib.parse.urlencode({"query": query}),
+        {"Authorization": f"Bearer {key}", "Accept": "application/json"},
+    )
+    out: list[Record] = []
+    for s in d.get("codeSnippets", []):
+        if len(out) >= budget:
+            break
+        code = "\n".join(c.get("code", "") for c in s.get("codeList", []))
+        lib = s.get("libraryId", "")
+        out.append(
+            rec(
+                "context7",
+                f"{lib}:{s.get('codeTitle', '')}",
+                f"https://context7.com{lib}" if lib.startswith("/") else lib,
+                lib,
+                f"{s.get('codeTitle', '')}\n{code}",
+                None,
+            )
+        )
+    for s in d.get("infoSnippets", []):
+        if len(out) >= budget:
+            break
+        lib = s.get("libraryId", "")
+        out.append(
+            rec(
+                "context7",
+                f"{lib}:{abs(hash(s.get('content', ''))) % 10**10}",
+                f"https://context7.com{lib}" if lib.startswith("/") else lib,
+                lib,
+                s.get("content", ""),
+                None,
+            )
+        )
+    return out[:budget], False
+
+
 BRAVE_PAGE = 20  # the API's maximum per request
 BRAVE_MAX_PAGES = 10  # offset stops at 9, so 200 results is the whole reach
 
@@ -603,6 +646,7 @@ SOURCES = {
     "sogou_wechat": src_sogou_wechat,
     "gdelt": src_gdelt,
     "marginalia": src_marginalia,
+    "context7": src_context7,
 }
 
 DEFAULT_SOURCES = [

@@ -266,7 +266,13 @@ def _classify(err: str) -> str:
         return "login"
     if "timeout" in low or "timed out" in low:
         return "timeout"
-    if "navigation rejected" in low or "command_exec" in low or "pre-navigation" in low:
+    if (
+        "navigation rejected" in low
+        or "command_exec" in low
+        or "pre-navigation" in low
+        or "captcha" in low
+        or "not_found" in low  # e.g. Google: "No search results found ... check for CAPTCHA"
+    ):
         return "blocked"
     return "error"
 

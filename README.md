@@ -188,8 +188,9 @@ browser profile exists.
 | Variable | Effect |
 |----------|--------|
 | `GITHUB_TOKEN` | higher GitHub Search API rate limit |
-| `BRAVE_API_KEY` | enables the Brave Search API web source (metered) |
+| `BRAVE_API_KEY` | enables the keyed `brave_api` source (keyless `brave` runs through the browser) |
 | `MARGINALIA_API_KEY` | personal Marginalia key; adds `marginalia` to the default sweep |
+| `CONTEXT7_API_KEY` | enables Context7 code and library documentation search |
 | `HIKERAPI_KEY` | enables Instagram account recon |
 | `NET_SIFT_HOME` | session storage location (default `~/.net-sift`) |
 | `NET_SIFT_OPENCLI_BIN` | path to the `opencli` binary if not on `PATH` |

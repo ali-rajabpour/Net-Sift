@@ -28,7 +28,9 @@ Sources marked *browser* need a connected Chromium session; the rest need only t
 
 | Source | What it covers | Notes |
 |--------|----------------|-------|
-| `google` | general web search | browser; 10 results per query |
+| `google` | general web search | browser; 10 results per query; often CAPTCHA-blocked |
+| `brave` | general web search, independent index | browser; up to 18 per query |
+| `duckduckgo` | general web search | browser; up to 10 per query |
 | `google_news` | news headlines | dated |
 | `reuters` | Reuters articles | browser |
 | `youtube` | videos | browser |
@@ -47,7 +49,9 @@ Sources marked *browser* need a connected Chromium session; the rest need only t
 
 | Source | What it covers | Requires |
 |--------|----------------|----------|
-| `brave` | general web search, independent index | `BRAVE_API_KEY`; metered, at most 10 requests and 200 results per sweep |
+| `brave_api` | Brave Search API, for when there is no managed profile | `BRAVE_API_KEY`; metered, at most 10 requests and 200 results per sweep |
+| `context7` | up-to-date code and library documentation | `CONTEXT7_API_KEY` |
+| `marginalia` | independent index of the small, non-commercial web | `MARGINALIA_API_KEY` for the default sweep |
 
 ## Walled (login, through OpenCLI, opt-in by connectivity)
 
@@ -78,8 +82,9 @@ accounts are signed in.
 | Variable | Effect |
 |----------|--------|
 | `GITHUB_TOKEN` | higher GitHub Search API rate limit |
-| `BRAVE_API_KEY` | enables the Brave Search API web source |
+| `BRAVE_API_KEY` | enables the keyed `brave_api` source (keyless `brave` runs through the browser) |
 | `MARGINALIA_API_KEY` | personal Marginalia key; adds `marginalia` to the default sweep |
+| `CONTEXT7_API_KEY` | enables Context7 code and library documentation search |
 | `HIKERAPI_KEY` | enables Instagram account recon |
 | `NET_SIFT_HOME` | where sessions are stored (default `~/.net-sift`) |
 | `NET_SIFT_OPENCLI_BIN` | path to the `opencli` binary if not on `PATH` |

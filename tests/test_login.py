@@ -31,6 +31,10 @@ def test_classify():
     assert installer._classify("code: TIMEOUT xiaohongshu timed out") == "timeout"
     assert installer._classify("COMMAND_EXEC Pre-navigation to ... failed") == "blocked"
     assert installer._classify("Navigation rejected.") == "blocked"
+    assert (
+        installer._classify("code: NOT_FOUND No search results found, check for CAPTCHA")
+        == "blocked"
+    )
     assert installer._classify("non-JSON output") == "error"
 
 
