@@ -7,6 +7,7 @@ the raw corpus back, only a summary plus the on-disk path.
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta, timezone
 
 from . import config, sessions
@@ -15,15 +16,31 @@ from .engine import core, sources
 
 
 def all_sources() -> dict[str, core.Source]:
-    """Keyless engine sources plus whatever walled OpenCLI adapters are live."""
+    """Keyless engine sources, whatever OpenCLI sources are live, and the Brave
+    Search API when a key is set."""
     merged: dict[str, core.Source] = dict(sources.SOURCES)
-    merged.update(opencli.walled_sources())
+    connected = opencli.available()
+    merged.update(opencli.walled_sources(connected))
+    merged.update(opencli.open_sources(connected))
+    key = config.get_secret("BRAVE_API_KEY")
+    if key:
+        merged["brave"] = lambda q, s, u, b: sources.src_brave(q, s, u, b, key)
     return merged
 
 
 def default_names(source_map: dict[str, core.Source]) -> list[str]:
-    walled = [s for s in opencli.WALLED_SITES if s in source_map]
-    return list(sources.DEFAULT_SOURCES) + walled
+    names = list(sources.DEFAULT_SOURCES)
+    if os.environ.get("MARGINALIA_API_KEY"):
+        names.append("marginalia")
+    live = (*opencli.WALLED_SITES, *opencli.OPEN_SEARCH, "brave")
+    return names + [s for s in live if s in source_map]
+
+
+def discover_telegram(query: str, source_map: dict[str, core.Source]) -> list[str]:
+    """Telegram has no cross-channel search. Ask Google which public channels cover
+    the topic, so the telegram source has a channel list to read."""
+    recs, _ = source_map["google"](sources.TELEGRAM_DISCOVERY.format(query=query), None, None, 10)
+    return sources.telegram_channels(str(r.get("url") or "") for r in recs)
 
 
 def _coverage(logs: list[str]) -> dict:
@@ -58,9 +75,18 @@ def deep_search(
 ) -> dict:
     """Run a sweep, save the session, and return a summary (no raw corpus)."""
     source_map = all_sources()
+    tg_gap = None
+    wants_telegram = platforms is None or "telegram" in platforms
+    if not tg_channels and wants_telegram and "google" in source_map:
+        try:
+            tg_channels = discover_telegram(query, source_map)
+        except Exception as e:  # a failed discovery is a declared gap, like any source
+            tg_gap = f"telegram[0] FAILED: channel discovery: {type(e).__name__}: {e}"
     if tg_channels:
         source_map["telegram"] = lambda q, s, u, b: sources.src_telegram(q, s, u, b, tg_channels)
     names = [p for p in (platforms or default_names(source_map)) if p in source_map]
+    if tg_channels and platforms is None:
+        names.append("telegram")
     unknown = [p for p in (platforms or []) if p not in source_map]
 
     since_dt = core.parse_day(since) if since else datetime.now(timezone.utc) - timedelta(days=365)
@@ -88,6 +114,8 @@ def deep_search(
     }
     meta = sessions.save(query, params, records, logs)
     cov = _coverage(logs)
+    if tg_gap:
+        cov["gaps"].append(tg_gap)
 
     return {
         "session_id": meta["id"],

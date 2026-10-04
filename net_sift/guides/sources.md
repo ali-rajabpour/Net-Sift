@@ -15,6 +15,39 @@
 | `v2ex` | Chinese developer community | full-text via sov2ex |
 | `telegram` | public channels | needs a channel list; recent history only |
 | `sogou_wechat` | WeChat public-account articles | single page, snippet-level |
+| `gdelt` | worldwide news in 65 languages | 250 articles per call, bisected by date; one request per 5 seconds per IP |
+| `marginalia` | independent index of the small, non-commercial web | undated; in the default sweep only with `MARGINALIA_API_KEY` |
+
+`telegram` needs a channel list. Pass one, or connect a browser: net-sift then asks
+Google for `site:t.me subscribers <query>` and reads the channels it finds.
+
+## Open web (no account, through OpenCLI)
+
+Sources marked *browser* need a connected Chromium session; the rest need only the
+`opencli` binary.
+
+| Source | What it covers | Notes |
+|--------|----------------|-------|
+| `google` | general web search | browser; 10 results per query |
+| `google_news` | news headlines | dated |
+| `reuters` | Reuters articles | browser |
+| `youtube` | videos | browser |
+| `tiktok` | videos | browser |
+| `apple_podcasts` | podcast shows | |
+| `substack` | newsletter posts | |
+| `medium` | articles | browser |
+| `weixin` | WeChat public-account articles | browser; 10 per query |
+| `tieba` | Baidu Tieba threads | browser |
+| `stackoverflow` | questions | |
+| `wikipedia` | encyclopedia articles | |
+| `wikidata` | entities | |
+| `archive` | Internet Archive items | |
+
+## Keyed (opt-in by key)
+
+| Source | What it covers | Requires |
+|--------|----------------|----------|
+| `brave` | general web search, independent index | `BRAVE_API_KEY`; metered, at most 10 requests and 200 results per sweep |
 
 ## Walled (login, through OpenCLI, opt-in by connectivity)
 
@@ -43,6 +76,8 @@ in. See `setup-opencli.md`. Run `net-sift doctor` to see the live set.
 | Variable | Effect |
 |----------|--------|
 | `GITHUB_TOKEN` | higher GitHub Search API rate limit |
+| `BRAVE_API_KEY` | enables the Brave Search API web source |
+| `MARGINALIA_API_KEY` | personal Marginalia key; adds `marginalia` to the default sweep |
 | `HIKERAPI_KEY` | enables Instagram account recon |
 | `NET_SIFT_HOME` | where sessions are stored (default `~/.net-sift`) |
 | `NET_SIFT_OPENCLI_BIN` | path to the `opencli` binary if not on `PATH` |

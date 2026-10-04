@@ -20,6 +20,8 @@ DEFAULT_MIN_REL = 0.1  # relevance floor for ranking
 #: Optional environment keys the tool will use if present (never required).
 OPTIONAL_ENV = {
     "GITHUB_TOKEN": "lifts the GitHub Search API rate limit",
+    "BRAVE_API_KEY": "enables the Brave Search API web source (metered)",
+    "MARGINALIA_API_KEY": "personal Marginalia key; adds it to the default sweep",
 }
 
 

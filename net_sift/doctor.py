@@ -7,7 +7,6 @@ in Agent Reach (MIT).
 
 from __future__ import annotations
 
-import os
 import shutil
 from datetime import datetime, timedelta, timezone
 
@@ -33,8 +32,9 @@ def report(probe: bool = False) -> dict:
         "walled_available": sorted(walled.keys()),
         "walled_supported": list(opencli.WALLED_SITES),
         "keyless_sources": list(sources.SOURCES.keys()),
+        "open_sources": sorted(opencli.open_sources(connected=connected)),
         "optional_env": {
-            k: ("set" if os.environ.get(k) else "unset") + f" ({desc})"
+            k: ("set" if config.get_secret(k) else "unset") + f" ({desc})"
             for k, desc in config.OPTIONAL_ENV.items()
         },
         "darkweb": "tor found (available)"
@@ -104,6 +104,7 @@ def render(probe: bool = False) -> str:
     lines.append(f"node     : {d['node']}")
     lines.append(f"accounts : {', '.join(d['walled_available']) or 'none connected'}")
     lines.append(f"keyless  : {', '.join(d['keyless_sources'])}")
+    lines.append(f"web      : {', '.join(d['open_sources']) or 'none (needs OpenCLI)'}")
     lines.append(f"darkweb  : {d['darkweb']}")
     lines.append(f"ig recon : {d['instagram_recon']}")
     lines.append("env     :")

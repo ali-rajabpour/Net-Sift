@@ -6,6 +6,38 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- General web search: `google` through the connected browser, and `brave` through
+  the Brave Search API when `BRAVE_API_KEY` is set (capped at 10 requests and 200
+  results per sweep, never bisected).
+- News: `gdelt` (keyless, 65 languages, bisected by date), `google_news`, `reuters`.
+- Video and audio: `youtube`, `tiktok`, `apple_podcasts`.
+- Long-form: `substack`, `medium`. Small web: `marginalia`.
+- Reference and archive: `stackoverflow`, `wikipedia`, `wikidata`, `archive`.
+- Chinese: `weixin`, `tieba`.
+- Telegram channel discovery: with a browser connected, the sweep finds public
+  channels for the query through Google and reads them, so `telegram` no longer
+  needs a hand-written channel list.
+- `net-sift doctor` lists the open web sources and the new optional keys.
+
+### Fixed
+
+- `telegram` reported a ceiling on every call, so the driver fetched the same
+  channel pages up to 127 times per sweep. It now fetches each channel once.
+- `sogou_wechat` had the same always-ceiling fault and repeated one request up to
+  127 times, which also tripped its captcha. A block is now one declared gap.
+- `github` ignored the date window and treated a rate limit as a ceiling, so it
+  re-ran identical queries while rate limited. It now searches inside the window
+  (`pushed:` for repositories, `updated:` for issues) and reports a failure as a gap.
+- `telegram` now drops posts outside the date window.
+- `polymarket` reported a failed request as zero records instead of a gap.
+- Request pacing used one lock for all hosts, so a slow host stalled every other
+  source. Pacing is now per host.
+- OpenCLI counts and epochs that arrive as strings (`"2,567,631 views"`) are now
+  parsed, so engagement and dates reach the ranker.
+- An OpenCLI adapter that finds nothing is an empty result, not a failed source.
+
 ## [0.6.2] - 2026-10-04
 
 ### Removed

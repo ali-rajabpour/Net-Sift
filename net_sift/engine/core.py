@@ -33,11 +33,14 @@ UA = (
 TIMEOUT = 30
 RETRIES = 5
 PACE = 0.7  # default seconds between two requests to the same host
-HOST_PACE = {"api.pullpush.io": 6.0}  # this one throttles far harder than the rest
+# Hosts that throttle harder than the rest: GDELT asks for one request per five
+# seconds, the Brave free plan allows one per second.
+HOST_PACE = {"api.pullpush.io": 6.0, "api.gdeltproject.org": 6.0, "api.search.brave.com": 1.1}
 FATAL = (400, 401, 404, 422)  # not worth retrying; everything else backs off
 
 _last_call: dict[str, float] = {}
 _pace_lock = threading.Lock()
+_host_locks: dict[str, threading.Lock] = {}
 
 Record = dict[str, object]
 Source = Callable[[str, datetime | None, datetime | None, int], tuple[list[Record], bool]]
@@ -51,6 +54,8 @@ def _get(url: str, headers: dict | None = None) -> bytes:
     last: Exception | None = None
     for attempt in range(RETRIES):
         with _pace_lock:
+            host_lock = _host_locks.setdefault(host, threading.Lock())
+        with host_lock:
             gap = pace - (time.time() - _last_call.get(host, 0.0))
             if gap > 0:
                 time.sleep(gap)

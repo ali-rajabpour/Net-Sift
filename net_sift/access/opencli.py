@@ -23,6 +23,7 @@ import shutil
 import subprocess
 import time
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 
 from ..engine.core import Record, parse_iso, rec
 
@@ -43,6 +44,27 @@ WALLED_SEARCH = {
     "zhihu": "search",
 }
 WALLED_SITES = tuple(WALLED_SEARCH)
+
+# Open sources that need no account, reached through OpenCLI:
+# name -> (site, command, max --limit, needs the browser). Every entry was run live
+# before being listed. Google rejects the navigation above 10 results per query.
+# ponytail: one page per query, no offset paging; add paging if depth matters.
+OPEN_SEARCH = {
+    "google": ("google", "search", 10, True),
+    "google_news": ("google", "news", 50, False),
+    "reuters": ("reuters", "search", 40, True),
+    "youtube": ("youtube", "search", 50, True),
+    "tiktok": ("tiktok", "search", 50, True),
+    "apple_podcasts": ("apple-podcasts", "search", 50, False),
+    "substack": ("substack", "search", 50, False),
+    "medium": ("medium", "search", 50, True),
+    "weixin": ("weixin", "search", 10, True),
+    "tieba": ("tieba", "search", 20, True),
+    "stackoverflow": ("stackoverflow", "search", 50, False),
+    "wikipedia": ("wikipedia", "search", 50, False),
+    "wikidata": ("wikidata", "search", 50, False),
+    "archive": ("archive", "search", 100, False),
+}
 
 # Friendly name + login URL per platform, for the setup wizard.
 WALLED_META = {
@@ -148,9 +170,11 @@ def run(
     except (OSError, subprocess.SubprocessError) as e:
         raise OpenCLIUnavailable(f"opencli invocation failed: {e}") from e
     if proc.returncode != 0:
-        raise OpenCLIUnavailable(
-            f"opencli {site} {command} exit {proc.returncode}: {proc.stderr.strip()[:200]}"
-        )
+        # OpenCLI prints its error envelope on stdout for some adapters.
+        detail = " ".join((proc.stderr.strip() or proc.stdout.strip()).split())[:200]
+        if "EMPTY_RESULT" in detail:
+            return []  # the adapter ran and found nothing; that is not a failure
+        raise OpenCLIUnavailable(f"opencli {site} {command} exit {proc.returncode}: {detail}")
     out = proc.stdout.strip()
     if not out:
         return []
@@ -214,6 +238,7 @@ def _parse_list_text(text: str) -> dict[str, list[str]]:
 
 _ID_KEYS = ("id", "rest_id", "note_id", "aweme_id", "pk", "objectID", "url")
 _URL_KEYS = ("url", "link", "permalink", "share_url", "webpage_url", "href")
+_TITLE_KEYS = ("title", "label")
 _TEXT_KEYS = (
     "text",
     "full_text",
@@ -224,23 +249,32 @@ _TEXT_KEYS = (
     "desc",
     "description",
     "summary",
-    "title",
+    "snippet",
 )
 _CREATED_KEYS = (
     "created_at",
     "createdAt",
     "created_utc",
+    "creation_date",
     "timestamp",
     "taken_at",
     "published",
+    "publish_time",
     "date",
     "time",
 )
 _ENGAGEMENT = {
-    "likes": ("likes", "like_count", "favorite_count", "digg_count", "favoriteCount"),
-    "comments": ("comments", "comment_count", "reply_count", "replies", "commentCount"),
+    "likes": ("likes", "like_count", "favorite_count", "digg_count", "favoriteCount", "claps"),
+    "comments": (
+        "comments",
+        "comment_count",
+        "reply_count",
+        "replies",
+        "commentCount",
+        "answers",
+    ),
     "reposts": ("reposts", "retweet_count", "share_count", "shares", "forwards"),
-    "views": ("views", "play_count", "view_count", "viewCount"),
+    "views": ("views", "play_count", "view_count", "viewCount", "plays"),
     "score": ("score", "points", "upvotes", "ups"),
 }
 
@@ -254,7 +288,19 @@ def _first(d: dict, keys) -> object:
 
 
 def _author(d: dict) -> str | None:
-    for k in ("author", "username", "screen_name", "handle", "uploader", "nickname", "name"):
+    for k in (
+        "author",
+        "username",
+        "screen_name",
+        "handle",
+        "uploader",
+        "nickname",
+        "name",
+        "channel",
+        "creator",
+        "authors",
+        "source",
+    ):
         v = d.get(k)
         if isinstance(v, str) and v:
             return v
@@ -271,19 +317,35 @@ def _created(d: dict) -> str | None:
     v = _first(d, _CREATED_KEYS)
     if v is None:
         return None
+    if isinstance(v, str) and v.isdigit():  # adapters print epochs as strings
+        v = int(v)
     if isinstance(v, (int, float)) and v > 1_000_000_000:
         return datetime.fromtimestamp(v, timezone.utc).isoformat()
     if isinstance(v, str):
+        try:  # RSS-style dates (Google News) -> ISO so the date window applies
+            return parsedate_to_datetime(v).isoformat()
+        except (TypeError, ValueError):
+            return v
+    return None
+
+
+def _num(v) -> float | None:
+    """Counts arrive as numbers or as strings like "2,567,631 views"."""
+    if isinstance(v, (int, float)):
         return v
+    if isinstance(v, str):
+        digits = v.split()[0].replace(",", "") if v.split() else ""
+        if digits.lstrip("-").isdigit():
+            return int(digits)
     return None
 
 
 def _text(d: dict) -> str:
     parts = []
-    for k in ("title",):
+    for k in _TITLE_KEYS:
         if isinstance(d.get(k), str) and d[k]:
             parts.append(d[k])
-    body = _first(d, [k for k in _TEXT_KEYS if k != "title"])
+    body = _first(d, _TEXT_KEYS)
     if isinstance(body, dict):
         body = body.get("text") or ""
     if isinstance(body, str) and body and body not in parts:
@@ -300,8 +362,8 @@ def normalize(item: dict, site: str) -> Record | None:
         return None
     extra = {}
     for field, keys in _ENGAGEMENT.items():
-        v = _first(item, keys)
-        if isinstance(v, (int, float)):
+        v = _num(_first(item, keys))
+        if v is not None:
             extra[field] = v
     return rec(
         site,
@@ -326,14 +388,24 @@ def _items(payload) -> list[dict]:
     return []
 
 
-def make_source(site: str, command: str):
-    """Build an engine source that searches one walled platform via OpenCLI."""
+def make_source(site: str, command: str, name: str | None = None, max_limit: int = 100):
+    """Build an engine source that searches one site via OpenCLI. `name` is the
+    source name records carry, when it differs from the OpenCLI site id."""
+    name = name or site
 
     def source(query, since, until, budget):
-        payload = run(site, command, query, limit=min(budget, 100))
+        for attempt in range(3):
+            try:
+                payload = run(site, command, query, limit=min(budget, max_limit))
+                break
+            except OpenCLIUnavailable as e:
+                # The bridge rejects a navigation now and then; the next try passes.
+                if "navigation rejected" not in str(e).lower() or attempt == 2:
+                    raise
+                time.sleep(2)
         out: list[Record] = []
         for item in _items(payload)[:budget]:
-            r = normalize(item, site)
+            r = normalize(item, name)
             if not r:
                 continue
             when = parse_iso(r.get("created_at"))
@@ -344,8 +416,22 @@ def make_source(site: str, command: str):
             out.append(r)
         return out, False
 
-    source.__name__ = f"opencli_{site}"
+    source.__name__ = f"opencli_{name}"
     return source
+
+
+def open_sources(connected: bool | None = None) -> dict[str, object]:
+    """Build a source per OPEN_SEARCH entry. Public adapters need only the opencli
+    binary; browser-backed ones also need a connected session."""
+    if not binary():
+        return {}
+    if connected is None:
+        connected = available()
+    return {
+        name: make_source(site, cmd, name, cap)
+        for name, (site, cmd, cap, needs_browser) in OPEN_SEARCH.items()
+        if connected or not needs_browser
+    }
 
 
 def _probe_once(site: str, timeout: int) -> tuple[bool, str]:

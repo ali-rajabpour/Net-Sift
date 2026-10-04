@@ -18,7 +18,7 @@ def snapshot() -> dict:
     return {
         "opencli": connected,
         "walled": sorted(opencli.WALLED_SITES) if connected else [],
-        "keyless_count": len(sources.SOURCES),
+        "keyless_count": len(sources.SOURCES) + len(opencli.open_sources(connected)),
     }
 
 

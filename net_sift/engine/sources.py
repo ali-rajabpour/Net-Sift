@@ -9,6 +9,7 @@ are not here: they are reached through the logged-in browser in
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import urllib.parse
@@ -114,7 +115,8 @@ def src_hackernews(query, since, until, budget):
 
 def src_github(query, since, until, budget):
     """GitHub repos + issues/PRs via the keyless Search API. Optional GITHUB_TOKEN
-    (env) lifts the rate limit."""
+    (env) lifts the rate limit. Each endpoint stops at 1000 results per query, so a
+    full run inside a date window is a ceiling the driver can bisect."""
     hdr = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
     tok = os.environ.get("GITHUB_TOKEN")
     if tok:
@@ -122,29 +124,33 @@ def src_github(query, since, until, budget):
     out: list[Record] = []
     ceiling = False
 
-    def sweep(path, to_rec):
+    window = f"{since:%Y-%m-%d}..{until:%Y-%m-%d}" if since and until else None
+
+    def sweep(path, date_field, to_rec):
         nonlocal ceiling
-        page = 1
-        while len(out) < budget and page <= 10:
-            p = {"q": query, "sort": "updated", "order": "desc", "per_page": 50, "page": page}
+        q = f"{query} {date_field}:{window}" if window else query
+        for page in range(1, 11):
+            if len(out) >= budget:
+                return
+            p = {"q": q, "sort": "updated", "order": "desc", "per_page": 100, "page": page}
             try:
                 d = _json(f"https://api.github.com/search/{path}?{urllib.parse.urlencode(p)}", hdr)
             except Exception:
-                ceiling = True
-                return
+                if not out:
+                    raise  # nothing collected: report the failure as a gap
+                return  # rate limited part way: keep what arrived
             items = d.get("items") or []
-            if not items:
-                return
             for x in items:
                 r = to_rec(x)
                 if r:
                     out.append(r)
-            if len(items) < 50:
+            if len(items) < 100:
                 return
-            page += 1
+        ceiling = bool(window)
 
     sweep(
         "repositories",
+        "pushed",
         lambda x: rec(
             "github",
             f"repo:{x.get('id')}",
@@ -157,6 +163,7 @@ def src_github(query, since, until, budget):
     )
     sweep(
         "issues",
+        "updated",
         lambda x: rec(
             "github",
             f"issue:{x.get('id')}",
@@ -232,10 +239,7 @@ def _arxiv_cat(entry):
 def src_polymarket(query, since, until, budget):
     """Polymarket prediction markets via the keyless Gamma API."""
     p = {"limit": min(budget, 100), "active": "true", "closed": "false", "search": query}
-    try:
-        events = _json(f"https://gamma-api.polymarket.com/events?{urllib.parse.urlencode(p)}")
-    except Exception:
-        return [], False
+    events = _json(f"https://gamma-api.polymarket.com/events?{urllib.parse.urlencode(p)}")
     if not isinstance(events, list):
         events = events.get("data", []) if isinstance(events, dict) else []
     out: list[Record] = []
@@ -377,10 +381,13 @@ def src_v2ex(query, since, until, budget):
 
 def src_telegram(query, since, until, budget, channels=None):
     """Public Telegram channels via the keyless t.me/s/ web preview. Telegram has
-    no cross-channel search, so this needs a channel list and sees recent history."""
+    no cross-channel search, so this needs a channel list and sees recent history.
+
+    The preview page ignores the date window, so this never reports a ceiling:
+    bisecting would only fetch the same pages again."""
     channels = channels or []
     if not channels:
-        return [], True
+        raise RuntimeError("no channel list (pass channels, or connect a browser for discovery)")
     out: list[Record] = []
     for ch in channels:
         if len(out) >= budget:
@@ -398,22 +405,24 @@ def src_telegram(query, since, until, budget, channels=None):
             head = html[: m.start()]
             link = (re.findall(r'href="(https://t\.me/[^"]+/\d+)"', head) or [""])[-1]
             when = (re.findall(r'datetime="([^"]+)"', head) or [None])[-1]
+            at = parse_iso(when)
+            if at and ((since and at < since) or (until and at > until)):
+                continue
             out.append(rec("telegram", link or f"{ch}:{len(out)}", link, ch, text, when))
-    return out, True
+    return out, False
 
 
 def src_sogou_wechat(query, since, until, budget):
     """Sogou WeChat search: public-account articles, otherwise walled off. Chinese
-    content, single page (Sogou captchas aggressively), snippet-level."""
-    try:
-        html = _get(
-            "https://weixin.sogou.com/weixin?"
-            + urllib.parse.urlencode({"type": "2", "query": query})
-        ).decode("utf-8", "replace")
-    except Exception:
-        return [], True
+    content, single page (Sogou captchas aggressively), snippet-level.
+
+    The search ignores the date window, so this never reports a ceiling: bisecting
+    would repeat the same request and trip the captcha sooner."""
+    html = _get(
+        "https://weixin.sogou.com/weixin?" + urllib.parse.urlencode({"type": "2", "query": query})
+    ).decode("utf-8", "replace")
     if re.search(r"antispider|验证码", html):
-        return [], True
+        raise RuntimeError("blocked by the Sogou captcha")
     out: list[Record] = []
     for b in re.findall(r'<li[^>]*id="sogou_vr[^"]*"[\s\S]*?</li>', html):
         title = re.sub(
@@ -440,11 +449,146 @@ def src_sogou_wechat(query, since, until, budget):
                     None,
                 )
             )
-    return out, True
+    return out, False
 
 
-# Registry. Default set is broad keyless coverage; telegram needs --channels so it
-# is opt-in.
+def src_gdelt(query, since, until, budget):
+    """GDELT DOC 2.0: worldwide news in 65 languages, keyless. One call returns at
+    most 250 articles, so a full page is a ceiling and the driver bisects the window."""
+    p = {
+        "query": query,
+        "mode": "artlist",
+        "format": "json",
+        "maxrecords": 250,
+        "sort": "datedesc",
+    }
+    if since:
+        p["startdatetime"] = since.strftime("%Y%m%d%H%M%S")
+    if until:
+        p["enddatetime"] = until.strftime("%Y%m%d%H%M%S")
+    raw = _get("https://api.gdeltproject.org/api/v2/doc/doc?" + urllib.parse.urlencode(p))
+    body = raw.decode("utf-8", "replace").strip()
+    if not body.startswith("{"):
+        # Throttling and rejected queries come back as plain text with a 200.
+        raise RuntimeError(body[:120] or "empty response")
+    arts = json.loads(body, strict=False).get("articles", [])
+    out: list[Record] = []
+    for a in arts[:budget]:
+        try:
+            when = (
+                datetime.strptime(a.get("seendate", ""), "%Y%m%dT%H%M%SZ")
+                .replace(tzinfo=timezone.utc)
+                .isoformat()
+            )
+        except ValueError:
+            when = None
+        out.append(
+            rec(
+                "gdelt",
+                a.get("url"),
+                a.get("url"),
+                a.get("domain"),
+                a.get("title"),
+                when,
+                {"language": a.get("language"), "country": a.get("sourcecountry")},
+            )
+        )
+    return out, len(arts) >= 250
+
+
+def src_marginalia(query, since, until, budget):
+    """Marginalia: an independent index of the small, non-commercial web. Results
+    are undated. The shared `public` key runs out most days, so the source joins the
+    default set only when MARGINALIA_API_KEY holds a personal key."""
+    d = _json(
+        "https://api2.marginalia-search.com/search?"
+        + urllib.parse.urlencode({"query": query, "count": min(budget, 100)}),
+        {"API-Key": os.environ.get("MARGINALIA_API_KEY", "public")},
+    )
+    out = [
+        rec(
+            "marginalia",
+            x.get("url"),
+            x.get("url"),
+            None,
+            f"{x.get('title') or ''}\n{x.get('description') or ''}",
+            None,
+        )
+        for x in d.get("results", [])[:budget]
+    ]
+    return out, False
+
+
+BRAVE_PAGE = 20  # the API's maximum per request
+BRAVE_MAX_PAGES = 10  # offset stops at 9, so 200 results is the whole reach
+
+
+def src_brave(query, since, until, budget, key=None):
+    """Brave Search API: an independent general web index. Metered, so it needs
+    BRAVE_API_KEY and is never bisected: one sweep costs at most 10 requests and the
+    tail past 200 results is a declared gap, not a reason to spend more."""
+    key = key or os.environ.get("BRAVE_API_KEY")
+    if not key:
+        raise RuntimeError("BRAVE_API_KEY is not set")
+    p = {"q": query, "count": BRAVE_PAGE}
+    if since and until:
+        p["freshness"] = f"{since:%Y-%m-%d}to{until:%Y-%m-%d}"
+    out: list[Record] = []
+    for page in range(BRAVE_MAX_PAGES):
+        if len(out) >= budget:
+            break
+        d = _json(
+            "https://api.search.brave.com/res/v1/web/search?"
+            + urllib.parse.urlencode({**p, "offset": page}),
+            {"X-Subscription-Token": key, "Accept": "application/json"},
+        )
+        results = (d.get("web") or {}).get("results", [])
+        for x in results:
+            out.append(
+                rec(
+                    "brave",
+                    x.get("url"),
+                    x.get("url"),
+                    (x.get("profile") or {}).get("name"),
+                    f"{x.get('title') or ''}\n{x.get('description') or ''}",
+                    x.get("page_age"),
+                )
+            )
+        if len(results) < BRAVE_PAGE or not (d.get("query") or {}).get("more_results_available"):
+            break
+    return out[:budget], False
+
+
+# t.me paths that are not channel names.
+_TG_RESERVED = {
+    "joinchat",
+    "addstickers",
+    "addemoji",
+    "addlist",
+    "share",
+    "proxy",
+    "socks",
+    "login",
+}
+
+#: Search-engine query that surfaces public channel pages for a topic. The word
+#: "subscribers" is on every channel preview page and on no other t.me page.
+TELEGRAM_DISCOVERY = "site:t.me subscribers {query}"
+
+
+def telegram_channels(urls) -> list[str]:
+    """Channel names from t.me result URLs, in first-seen order."""
+    seen: dict[str, None] = {}
+    for u in urls:
+        m = re.match(r"https?://t\.me/(?:s/)?([A-Za-z0-9_]{4,})", u or "")
+        if m and m.group(1).lower() not in _TG_RESERVED:
+            seen.setdefault(m.group(1), None)
+    return list(seen)
+
+
+# Registry. Default set is broad keyless coverage. telegram needs a channel list
+# (given, or discovered through a web search source), marginalia a personal key,
+# and brave is keyed and registered by the search facade, so none is a default here.
 SOURCES = {
     "bluesky": src_bluesky,
     "hackernews": src_hackernews,
@@ -457,6 +601,8 @@ SOURCES = {
     "v2ex": src_v2ex,
     "telegram": src_telegram,
     "sogou_wechat": src_sogou_wechat,
+    "gdelt": src_gdelt,
+    "marginalia": src_marginalia,
 }
 
 DEFAULT_SOURCES = [
@@ -467,4 +613,5 @@ DEFAULT_SOURCES = [
     "polymarket",
     "stocktwits",
     "mastodon",
+    "gdelt",
 ]
