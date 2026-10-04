@@ -21,6 +21,7 @@ import json
 import os
 import shutil
 import subprocess
+import threading
 import time
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
@@ -86,68 +87,20 @@ def binary() -> str | None:
     return shutil.which(OPENCLI_BIN)
 
 
-def doctor_text(timeout: int = 30) -> str | None:
-    """Run ``opencli doctor``. This both STARTS the daemon (it only auto-starts on
-    an opencli command) and reports connectivity. None when the binary is absent or
-    the call fails. Takes a few seconds, so callers that run often should use
-    ``available_cached``."""
-    exe = binary()
-    if not exe:
-        return None
-    try:
-        p = subprocess.run([exe, "doctor"], capture_output=True, text=True, timeout=timeout)
-        return (p.stdout or "") + (p.stderr or "")
-    except (OSError, subprocess.SubprocessError):
-        return None
+#: CDP endpoint of net-sift's managed browser for the current sweep. OpenCLI drives
+#: that browser when this is set; sources are no-ops otherwise.
+_ENDPOINT: str | None = None
+#: One OpenCLI call at a time per endpoint: concurrent calls crash the shared page.
+_run_lock = threading.Lock()
 
 
-def _parse_connected(text: str | None) -> bool:
-    if not text:
-        return False
-    low = text.lower()
-    return "connectivity: connected" in low or "extension: connected" in low
+def set_endpoint(url: str | None) -> None:
+    global _ENDPOINT
+    _ENDPOINT = url
 
 
-def available() -> bool:
-    """True when opencli is installed and a browser session is connected. Runs
-    ``opencli doctor``, which starts the daemon if needed, so calling this is also
-    what brings a freshly installed OpenCLI online."""
-    return _parse_connected(doctor_text())
-
-
-def available_cached(ttl: int = 60) -> bool:
-    """available() with a short on-disk cache, for frequent callers (status bar)."""
-    from .. import config
-
-    cache = config.HOME / ".opencli_status"
-    try:
-        d = json.loads(cache.read_text())
-        if time.time() - d.get("ts", 0) < ttl:
-            return bool(d.get("available"))
-    except (OSError, ValueError):
-        pass
-    val = available()
-    try:
-        config.HOME.mkdir(parents=True, exist_ok=True)
-        cache.write_text(json.dumps({"ts": time.time(), "available": val}))
-    except OSError:
-        pass
-    return val
-
-
-def status(connected: bool | None = None) -> str:
-    """One-line, secret-free summary for the doctor. Pass `connected` to reuse a
-    single connectivity check instead of running `opencli doctor` again."""
-    if not binary():
-        return "opencli: not installed (npm i -g @jackwener/opencli, or OpenCLIApp)"
-    if connected is None:
-        connected = available()
-    if connected:
-        return "opencli: connected"
-    return (
-        "opencli: installed, no browser session connected (open a Chromium browser "
-        "with the OpenCLI extension and log in; the daemon starts automatically)"
-    )
+def current_endpoint() -> str | None:
+    return _ENDPOINT
 
 
 def run(
@@ -158,15 +111,20 @@ def run(
     limit: int | None = None,
     timeout: int = 90,
 ):
-    """Run ``opencli <site> <command> [args] -f json`` and return parsed output."""
+    """Run ``opencli <site> <command> [args] -f json`` against the managed browser
+    and return parsed output. Serialized: OpenCLI shares one page per endpoint."""
     exe = binary()
     if not exe:
         raise OpenCLIUnavailable("opencli binary not found")
     cmd = [exe, site, command, *args, "-f", fmt]
     if limit is not None:
         cmd += ["--limit", str(limit)]
+    env = {**os.environ}
+    if _ENDPOINT:
+        env["OPENCLI_CDP_ENDPOINT"] = _ENDPOINT
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        with _run_lock:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
     except (OSError, subprocess.SubprocessError) as e:
         raise OpenCLIUnavailable(f"opencli invocation failed: {e}") from e
     if proc.returncode != 0:
@@ -182,56 +140,6 @@ def run(
         return json.loads(out)
     except ValueError as e:
         raise OpenCLIUnavailable(f"opencli {site} {command}: non-JSON output") from e
-
-
-def discover() -> dict[str, list[str]]:
-    """Map site -> [commands] from ``opencli list``. Empty when unavailable."""
-    exe = binary()
-    if not exe:
-        return {}
-    try:
-        proc = subprocess.run(
-            [exe, "list", "-f", "json"], capture_output=True, text=True, timeout=30
-        )
-        if proc.returncode == 0 and proc.stdout.strip():
-            return _parse_list_json(proc.stdout)
-    except (OSError, subprocess.SubprocessError):
-        pass
-    # Fall back to the plain-text listing shape ("site command  - description").
-    try:
-        proc = subprocess.run([exe, "list"], capture_output=True, text=True, timeout=30)
-        return _parse_list_text(proc.stdout) if proc.returncode == 0 else {}
-    except (OSError, subprocess.SubprocessError):
-        return {}
-
-
-def _parse_list_json(text: str) -> dict[str, list[str]]:
-    try:
-        data = json.loads(text)
-    except ValueError:
-        return {}
-    out: dict[str, list[str]] = {}
-    items = data if isinstance(data, list) else data.get("commands", [])
-    for it in items:
-        if not isinstance(it, dict):
-            continue
-        site = it.get("site") or it.get("namespace") or it.get("group")
-        command = it.get("command") or it.get("name") or it.get("action")
-        if site and command:
-            out.setdefault(site, []).append(command)
-    return out
-
-
-def _parse_list_text(text: str) -> dict[str, list[str]]:
-    out: dict[str, list[str]] = {}
-    for line in text.splitlines():
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        parts = line.split()
-        if len(parts) >= 2 and parts[0].isidentifier():
-            out.setdefault(parts[0], []).append(parts[1])
-    return out
 
 
 # --- normalization --------------------------------------------------------
@@ -422,11 +330,11 @@ def make_source(site: str, command: str, name: str | None = None, max_limit: int
 
 def open_sources(connected: bool | None = None) -> dict[str, object]:
     """Build a source per OPEN_SEARCH entry. Public adapters need only the opencli
-    binary; browser-backed ones also need a connected session."""
+    binary; browser-backed ones also need the managed endpoint set."""
     if not binary():
         return {}
     if connected is None:
-        connected = available()
+        connected = current_endpoint() is not None
     return {
         name: make_source(site, cmd, name, cap)
         for name, (site, cmd, cap, needs_browser) in OPEN_SEARCH.items()
@@ -434,66 +342,11 @@ def open_sources(connected: bool | None = None) -> dict[str, object]:
     }
 
 
-def _probe_once(site: str, timeout: int) -> tuple[bool, str]:
-    exe = binary()
-    if not exe:
-        return False, "no-opencli"
-    try:
-        p = subprocess.run(
-            [exe, site, "search", "news", "--limit", "1", "-f", "json"],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return False, "error"
-    blob = (p.stdout or "") + (p.stderr or "")
-    if "navigation rejected" in blob.lower():
-        return False, "blocked"
-    if p.returncode != 0 or not p.stdout.strip():
-        return False, "login"
-    try:
-        d = json.loads(p.stdout)
-    except ValueError:
-        return False, "error"
-    if isinstance(d, dict) and d.get("ok") is False:
-        msg = str((d.get("error") or {}).get("message", "")).lower()
-        return False, ("blocked" if "navigation rejected" in msg else "login")
-    return True, "ok"
-
-
-def probe_detail(site: str, timeout: int = 60, attempts: int = 2) -> tuple[bool, str]:
-    """Probe a platform with a real search. Returns (connected, reason):
-      (True, "ok")         - search worked, so the browser is logged in and usable
-      (False, "blocked")   - OpenCLI could not open the site (anti-automation block
-                             or a broken adapter); logging in will NOT fix this
-      (False, "login")     - reachable but the search failed; a login may help
-      (False, "no-opencli"/"error") - opencli missing or an unexpected failure
-
-    Retries transient failures: the first browser command after the daemon starts
-    is often flaky, so a logged-in account can falsely read as not connected on a
-    single try. A "blocked" or "no-opencli" result is definitive and not retried.
-    """
-    ok, reason = _probe_once(site, timeout)
-    for _ in range(max(0, attempts - 1)):
-        if ok or reason in ("blocked", "no-opencli"):
-            break
-        time.sleep(2)
-        ok, reason = _probe_once(site, timeout)
-    return ok, reason
-
-
-def probe_login(site: str, timeout: int = 60) -> bool:
-    """True when a real search on `site` works, i.e. the browser is logged into it."""
-    return probe_detail(site, timeout=timeout)[0]
-
-
 def walled_sources(connected: bool | None = None) -> dict[str, object]:
-    """Build a search source per walled platform, when a browser session is
-    connected. Uses the verified WALLED_SEARCH map rather than parsing `opencli
-    list`, so it is deterministic. Pass `connected` to reuse one connectivity check."""
+    """Build a search source per walled platform, live when the managed browser
+    endpoint is set. Uses the verified WALLED_SEARCH map, so it is deterministic."""
     if connected is None:
-        connected = available()
+        connected = current_endpoint() is not None
     if not connected:
         return {}
     return {site: make_source(site, cmd) for site, cmd in WALLED_SEARCH.items()}

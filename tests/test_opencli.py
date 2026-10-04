@@ -37,31 +37,6 @@ def test_items_envelopes():
     assert opencli._items({"nope": 1}) == []
 
 
-def test_parse_list_json():
-    txt = '[{"site":"twitter","command":"search"},{"site":"reddit","command":"search"}]'
-    cat = opencli._parse_list_json(txt)
-    assert cat["twitter"] == ["search"] and cat["reddit"] == ["search"]
-
-
-def test_parse_list_text():
-    txt = "twitter search  - search tweets\nreddit search  - search posts\n# comment\n"
-    cat = opencli._parse_list_text(txt)
-    assert "search" in cat["twitter"] and "search" in cat["reddit"]
-
-
-def test_available_false_without_binary(monkeypatch):
-    monkeypatch.setattr(opencli, "binary", lambda: None)
-    assert opencli.available() is False
-    assert opencli.walled_sources() == {}
-
-
-def test_walled_sources_deterministic():
-    s = opencli.walled_sources(connected=True)
-    assert set(s) == set(opencli.WALLED_SEARCH)
-    assert "twitter" in s and "x" not in s
-    assert opencli.walled_sources(connected=False) == {}
-
-
 def test_walled_meta_complete():
     assert set(opencli.WALLED_META) == set(opencli.WALLED_SEARCH)
 
@@ -71,74 +46,53 @@ class _Proc:
         self.returncode, self.stdout, self.stderr = returncode, stdout, ""
 
 
-def test_probe_login(monkeypatch):
+def test_run_uses_endpoint_and_serializes(monkeypatch):
+    seen = {}
+
+    def fake_run(cmd, capture_output, text, timeout, env=None):
+        seen["endpoint"] = (env or {}).get("OPENCLI_CDP_ENDPOINT")
+        return _Proc(0, '[{"title":"t","url":"u"}]')
+
+    monkeypatch.setattr(opencli.subprocess, "run", fake_run)
     monkeypatch.setattr(opencli, "binary", lambda: "/usr/bin/opencli")
-    monkeypatch.setattr(opencli.subprocess, "run", lambda *a, **k: _Proc(0, '[{"id": 1}]'))
-    assert opencli.probe_login("reddit") is True
-    # not logged in: nonzero exit
-    monkeypatch.setattr(opencli.subprocess, "run", lambda *a, **k: _Proc(1, '{"ok": false}'))
-    assert opencli.probe_login("twitter") is False
-    # ok:false with zero exit
-    monkeypatch.setattr(opencli.subprocess, "run", lambda *a, **k: _Proc(0, '{"ok": false}'))
-    assert opencli.probe_login("twitter") is False
-    # empty output
-    monkeypatch.setattr(opencli.subprocess, "run", lambda *a, **k: _Proc(0, ""))
-    assert opencli.probe_login("twitter") is False
+    opencli.set_endpoint("http://127.0.0.1:9999")
+    try:
+        out = opencli.run("google", "search", "q")
+        assert seen["endpoint"] == "http://127.0.0.1:9999"
+        assert out[0]["url"] == "u"
+    finally:
+        opencli.set_endpoint(None)
 
 
-def test_probe_login_no_binary(monkeypatch):
+def test_sources_live_only_with_endpoint(monkeypatch):
+    monkeypatch.setattr(opencli, "binary", lambda: "/usr/bin/opencli")
+    opencli.set_endpoint(None)
+    assert opencli.walled_sources() == {}
+    assert all(not need for *_, need in opencli.OPEN_SEARCH.values()) is False  # some need browser
+    public = opencli.open_sources()
+    assert "wikipedia" in public and "google" not in public  # google needs the endpoint
+    opencli.set_endpoint("http://127.0.0.1:1")
+    try:
+        assert set(opencli.walled_sources()) == set(opencli.WALLED_SEARCH)
+        assert "google" in opencli.open_sources()
+    finally:
+        opencli.set_endpoint(None)
+
+
+def test_open_sources_empty_without_binary(monkeypatch):
     monkeypatch.setattr(opencli, "binary", lambda: None)
-    assert opencli.probe_login("reddit") is False
+    opencli.set_endpoint("http://127.0.0.1:1")
+    try:
+        assert opencli.open_sources() == {}
+    finally:
+        opencli.set_endpoint(None)
 
 
-def test_probe_detail_classifies(monkeypatch):
+def test_run_empty_result_is_not_a_failure(monkeypatch):
     monkeypatch.setattr(opencli, "binary", lambda: "/usr/bin/opencli")
-    # success
-    monkeypatch.setattr(opencli.subprocess, "run", lambda *a, **k: _Proc(0, '[{"id": 1}]'))
-    assert opencli.probe_detail("reddit") == (True, "ok")
-    # facebook-style navigation block (ok:false with that message)
-    blocked = _Proc(
-        1,
-        '{"ok": false, "error": {"message": "Failed to open facebook search: Navigation rejected."}}',
-    )
-    monkeypatch.setattr(opencli.subprocess, "run", lambda *a, **k: blocked)
-    assert opencli.probe_detail("facebook") == (False, "blocked")
-    # reachable but search failed, no navigation phrase -> login
     monkeypatch.setattr(
         opencli.subprocess,
         "run",
-        lambda *a, **k: _Proc(0, '{"ok": false, "error": {"message": "not signed in"}}'),
+        lambda *a, **k: _Proc(1, '{"ok": false, "error": {"code": "EMPTY_RESULT"}}'),
     )
-    assert opencli.probe_detail("twitter") == (False, "login")
-
-
-def test_parse_connected():
-    doc = "[OK] Extension: connected (v1.0.24)\n[OK] Connectivity: connected in 4.6s"
-    assert opencli._parse_connected(doc) is True
-    assert opencli._parse_connected("Extension: disconnected") is False
-    assert opencli._parse_connected(None) is False
-
-
-def test_available_from_doctor(monkeypatch):
-    monkeypatch.setattr(
-        opencli, "doctor_text", lambda timeout=30: "[OK] Connectivity: connected in 1s"
-    )
-    assert opencli.available() is True
-    monkeypatch.setattr(opencli, "doctor_text", lambda timeout=30: "[!] Extension: reconnecting")
-    assert opencli.available() is False
-
-
-def test_available_cached(tmp_path, monkeypatch):
-    from net_sift import config
-
-    monkeypatch.setattr(config, "HOME", tmp_path)
-    calls = []
-
-    def fake_doctor(timeout=30):
-        calls.append(1)
-        return "Connectivity: connected"
-
-    monkeypatch.setattr(opencli, "doctor_text", fake_doctor)
-    assert opencli.available_cached() is True
-    assert opencli.available_cached() is True  # second read hits cache
-    assert len(calls) == 1
+    assert opencli.run("weibo", "search", "q") == []
