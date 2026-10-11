@@ -48,6 +48,24 @@ def test_browser_gap_when_no_profile(monkeypatch, tmp_path):
     assert any("no managed profile" in g for g in out["gaps"])
 
 
+def test_repeated_platforms_run_once(monkeypatch):
+    monkeypatch.setattr(search, "_managed_profile", lambda: None)
+    seen = {}
+
+    def fake_run(query, source_map, names, *a, **k):
+        seen["names"] = names
+        return [], []
+
+    monkeypatch.setattr(search.core, "run", fake_run)
+    monkeypatch.setattr(
+        search.sessions,
+        "save",
+        lambda *a, **k: {"id": "s", "count": 0, "sources": {}, "corpus": "c"},
+    )
+    search.deep_search("q", platforms=["hackernews", "arxiv", "hackernews"])
+    assert seen["names"] == ["hackernews", "arxiv"]
+
+
 def test_browser_choice_roundtrip(tmp_path):
     from net_sift import config
 

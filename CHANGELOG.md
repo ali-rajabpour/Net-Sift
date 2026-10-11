@@ -6,6 +6,27 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-10-11
+
+### Fixed
+
+- Concurrent browser sweeps collided. A model that fires several `deep_search` calls
+  in one turn (or two clients sweeping at once) launched a second Chromium on the same
+  managed profile; it never opened its CDP port, and its teardown killed the browser of
+  the sweep still running (`CDP connection is not open`, `ECONNREFUSED`). Sweeps now
+  queue on a per-profile lock that holds across threads and across every
+  `net-sift serve` process.
+- A keyless sweep finishing alongside a browser sweep no longer clears that sweep's
+  browser endpoint.
+- Long calls timed out in clients that drop a tool call after 60 s of silence
+  (opencode). `deep_search`, `resume`, `doctor`, and `darkweb_search` now send MCP
+  progress notifications while they work.
+- Codex drops a tool call after 60 s regardless. `net-sift install` now writes
+  `tool_timeout_sec = 1800` for the Codex entry and adds it to an existing one.
+- `doctor(probe=True)` probed the keyless sources one after another and could run
+  past a minute. It probes them concurrently.
+- A platform named twice in `platforms` ran twice and reported its gap twice.
+
 ## [1.2.2] - 2026-10-04
 
 ### Fixed

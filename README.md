@@ -119,6 +119,13 @@ net-sift install                # guided; add --yes for unattended
 Every step asks before it changes anything. Add an account later with
 `net-sift login <site>`. Restart your client afterward so it picks up the server.
 
+The wizard does not register opencode. Add the server to
+`~/.config/opencode/opencode.jsonc` yourself:
+
+```json
+"mcp": { "net-sift": { "type": "local", "command": ["net-sift", "serve"], "enabled": true } }
+```
+
 macOS only for now; Windows and Linux are planned.
 
 ## Quickstart

@@ -7,7 +7,10 @@ never flood the agent. Results, errors, and questions are all that surface.
 
 from __future__ import annotations
 
-from mcp.server.mcpserver import MCPServer
+import asyncio
+import contextlib
+
+from mcp.server.mcpserver import Context, MCPServer
 
 from . import config, sessions
 from . import darkweb as darkweb_mod
@@ -18,10 +21,37 @@ from . import status as status_mod
 
 mcp = MCPServer("net-sift")
 
+#: Seconds between progress notifications from a running tool.
+HEARTBEAT = 15
+
+
+async def _long(ctx: Context, fn, *args, **kwargs):
+    """Run a blocking tool in a thread and report progress while it works.
+
+    Several clients (opencode, anything on the MCP TypeScript SDK defaults) drop a
+    call after 60 s of silence and reset that clock on progress. A sweep queued
+    behind another browser sweep runs well past that.
+    """
+
+    async def beat():
+        n = 0
+        while True:
+            await asyncio.sleep(HEARTBEAT)
+            n += 1
+            with contextlib.suppress(Exception):  # a lost notification must not kill the tool
+                await ctx.report_progress(n, message=f"working ({n * HEARTBEAT}s)")
+
+    task = asyncio.create_task(beat())
+    try:
+        return await asyncio.to_thread(fn, *args, **kwargs)
+    finally:
+        task.cancel()
+
 
 @mcp.tool()
-def deep_search(
+async def deep_search(
     query: str,
+    ctx: Context,
     platforms: list[str] | None = None,
     since: str | None = None,
     until: str | None = None,
@@ -37,20 +67,29 @@ def deep_search(
     a summary and the on-disk corpus path; call resume()/cleanup() to continue or
     delete it.
     """
-    return search_mod.deep_search(
-        query, platforms=platforms, since=since, until=until, max_budget=max_budget, rank=rank
+    return await _long(
+        ctx,
+        search_mod.deep_search,
+        query,
+        platforms=platforms,
+        since=since,
+        until=until,
+        max_budget=max_budget,
+        rank=rank,
     )
 
 
 @mcp.tool()
-def resume(session_id: str, max_budget: int = config.DEFAULT_BUDGET) -> dict:
+async def resume(session_id: str, ctx: Context, max_budget: int = config.DEFAULT_BUDGET) -> dict:
     """Continue an earlier search: re-run its stored query and parameters to pick up
     anything new, saved as a fresh session."""
     meta = sessions.load_meta(session_id)
     if not meta:
         return {"error": f"no session {session_id}"}
     p = meta.get("params", {})
-    return search_mod.deep_search(
+    return await _long(
+        ctx,
+        search_mod.deep_search,
         meta["query"],
         platforms=p.get("platforms"),
         since=p.get("since"),
@@ -75,10 +114,10 @@ def cleanup(session_id: str) -> dict:
 
 
 @mcp.tool()
-def doctor(probe: bool = False) -> dict:
+async def doctor(ctx: Context, probe: bool = False) -> dict:
     """Report which sources net-sift can reach now, the managed browser, and which
     accounts are signed in. probe=True also live-checks the keyless sources."""
-    return doctor_mod.report(probe=probe)
+    return await _long(ctx, doctor_mod.report, probe=probe)
 
 
 @mcp.tool()
@@ -88,7 +127,7 @@ def status() -> dict:
 
 
 @mcp.tool()
-def darkweb_search(query: str, fetch: int = 0) -> dict:
+async def darkweb_search(query: str, ctx: Context, fetch: int = 0) -> dict:
     """Read-only, information-only discussion search across Tor onion forums.
 
     Discovers onion forums via onion search indexes and returns public discussion
@@ -98,7 +137,7 @@ def darkweb_search(query: str, fetch: int = 0) -> dict:
     summary and the on-disk corpus path.
     """
     try:
-        records, logs = darkweb_mod.darkweb(query, fetch=fetch)
+        records, logs = await _long(ctx, darkweb_mod.darkweb, query, fetch=fetch)
     except RuntimeError as e:
         return {"error": str(e)}
     meta = sessions.save(query, {"source": "darkweb", "fetch": fetch}, records, logs)

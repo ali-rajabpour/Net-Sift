@@ -105,6 +105,8 @@ def deep_search(
     top_n: int = 10,
 ) -> dict:
     """Run a sweep, save the session, and return a summary (no raw corpus)."""
+    if platforms:  # models repeat names; a repeat would run that source twice
+        platforms = list(dict.fromkeys(platforms))
     managed = _managed_profile()
     source_map = all_sources(with_browser=managed is not None)
     names = [p for p in (platforms or default_names(source_map)) if p in source_map]
@@ -154,7 +156,10 @@ def deep_search(
                 min_rel=min_rel,
             )
         finally:
-            opencli.set_endpoint(None)
+            # Only the sweep that owns the browser clears the endpoint; a keyless
+            # sweep finishing alongside must not blank it for the one still running.
+            if endpoint:
+                opencli.set_endpoint(None)
     params = {
         "platforms": names,
         "since": since,

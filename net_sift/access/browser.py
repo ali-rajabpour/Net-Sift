@@ -7,6 +7,7 @@ profile, so it can decrypt its own cookies. It is killed and verified dead on ex
 from __future__ import annotations
 
 import contextlib
+import fcntl
 import socket
 import subprocess
 import time
@@ -51,29 +52,35 @@ def _running_for(user_data_dir: str) -> int:
 @contextlib.contextmanager
 def managed_browser(executable: str, profile_dir: str, headed: bool = False, timeout: int = 30):
     """Yield a CDP base URL for a managed browser; always tear it down on exit."""
-    port = free_port()
-    args = [
-        executable,
-        f"--remote-debugging-port={port}",
-        f"--user-data-dir={profile_dir}",
-        "--no-first-run",
-        "--no-default-browser-check",
-    ]
-    if not headed:
-        args += ["--headless=new", "--window-size=1280,900", f"--user-agent={_UA}"]
-    proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    try:
-        if not _wait_cdp(port, timeout):
-            raise RuntimeError(f"browser CDP did not come up on port {port}")
-        yield f"http://127.0.0.1:{port}"
-    finally:
-        proc.terminate()
+    # One browser per profile at a time, across threads and across every
+    # `net-sift serve` process. A second Chromium on the same user-data-dir hands
+    # off to the first and exits, so its CDP port never opens, and the pkill below
+    # would then take down the sweep that is still running. Callers queue instead.
+    with open(f"{profile_dir.rstrip('/')}.lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        port = free_port()
+        args = [
+            executable,
+            f"--remote-debugging-port={port}",
+            f"--user-data-dir={profile_dir}",
+            "--no-first-run",
+            "--no-default-browser-check",
+        ]
+        if not headed:
+            args += ["--headless=new", "--window-size=1280,900", f"--user-agent={_UA}"]
+        proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
-            proc.wait(timeout=15)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            with contextlib.suppress(Exception):
-                proc.wait(timeout=5)
-        time.sleep(1.0)
-        if _running_for(profile_dir):
-            subprocess.run(["pkill", "-f", profile_dir])
+            if not _wait_cdp(port, timeout):
+                raise RuntimeError(f"browser CDP did not come up on port {port}")
+            yield f"http://127.0.0.1:{port}"
+        finally:
+            proc.terminate()
+            try:
+                proc.wait(timeout=15)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                with contextlib.suppress(Exception):
+                    proc.wait(timeout=5)
+            time.sleep(1.0)
+            if _running_for(profile_dir):
+                subprocess.run(["pkill", "-f", profile_dir])

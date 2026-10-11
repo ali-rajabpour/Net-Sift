@@ -8,6 +8,7 @@ reports the chosen browser and which sites that profile is signed into.
 from __future__ import annotations
 
 import shutil
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 
 from . import config
@@ -81,17 +82,21 @@ def _node_version() -> str:
 
 def _probe_keyless() -> dict:
     now = datetime.now(timezone.utc)
-    out = {}
-    for name, fn in sources.SOURCES.items():
+
+    def probe(item) -> str:
+        name, fn = item
         if name == "telegram":  # needs channels; skip in a generic probe
-            out[name] = "skipped (needs --channels)"
-            continue
+            return "skipped (needs --channels)"
         try:
             recs, _ = fn("test", now - timedelta(days=30), now, 3)
-            out[name] = f"ok ({len(recs)})"
+            return f"ok ({len(recs)})"
         except Exception as e:
-            out[name] = f"unreachable: {type(e).__name__}"
-    return out
+            return f"unreachable: {type(e).__name__}"
+
+    # Concurrent: one slow or blocked source otherwise holds up the whole report.
+    items = list(sources.SOURCES.items())
+    with ThreadPoolExecutor(max_workers=len(items)) as ex:
+        return dict(zip(sources.SOURCES, ex.map(probe, items), strict=True))
 
 
 def _guidance(managed: dict, sites: dict) -> str:

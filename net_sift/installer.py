@@ -146,10 +146,17 @@ def compose_statusline(path: Path, home: Path, ui: _UI) -> str:
 
 def ensure_codex(path: Path) -> str:
     """Add [mcp_servers.net-sift] to a Codex config.toml without rewriting the file."""
-    block = '\n[mcp_servers.net-sift]\ncommand = "net-sift"\nargs = ["serve"]\n'
+    # Codex drops a tool call after 60 s by default; a sweep, or one queued behind
+    # another sweep's browser, runs longer.
+    header, limit = "[mcp_servers.net-sift]", "tool_timeout_sec = 1800"
+    block = f'\n{header}\ncommand = "net-sift"\nargs = ["serve"]\n{limit}\n'
     existing = path.read_text(encoding="utf-8") if path.exists() else ""
-    if "[mcp_servers.net-sift]" in existing:
-        return f"already present in {path}"
+    if header in existing:
+        table = existing.split(header, 1)[1].split("\n[", 1)[0]
+        if "tool_timeout_sec" in table:
+            return f"already present in {path}"
+        path.write_text(existing.replace(header, f"{header}\n{limit}", 1), encoding="utf-8")
+        return f"raised the tool timeout in {path}"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(existing + block, encoding="utf-8")
     return f"registered MCP in {path}"

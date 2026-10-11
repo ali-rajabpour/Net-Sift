@@ -48,3 +48,23 @@ def test_ensure_codex_appends_once(tmp_path):
     assert "[mcp_servers.net-sift]" in text and "[existing]" in text
     assert "already present" in cli.ensure_codex(p)
     assert p.read_text().count("[mcp_servers.net-sift]") == 1
+    assert "tool_timeout_sec" in text
+
+
+def test_ensure_codex_raises_timeout_on_existing_entry(tmp_path):
+    p = tmp_path / "config.toml"
+    p.write_text(
+        '[mcp_servers.net-sift]\ncommand = "net-sift"\nargs = ["serve"]\n\n'
+        "[mcp_servers.other]\ntool_timeout_sec = 5\n"
+    )
+    assert "raised" in cli.ensure_codex(p)
+    import tomllib
+
+    servers = tomllib.loads(p.read_text())["mcp_servers"]
+    assert servers["net-sift"] == {
+        "command": "net-sift",
+        "args": ["serve"],
+        "tool_timeout_sec": 1800,
+    }
+    assert servers["other"] == {"tool_timeout_sec": 5}
+    assert "already present" in cli.ensure_codex(p)

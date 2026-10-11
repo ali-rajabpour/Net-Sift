@@ -48,6 +48,35 @@ def test_managed_browser_tears_down(monkeypatch, tmp_path):
     assert calls["terminated"] and calls["waited"] and calls["alive_checks"] >= 1
 
 
+def test_managed_browser_is_exclusive_per_profile(monkeypatch, tmp_path):
+    import threading
+
+    class FakeProc:
+        def terminate(self):
+            pass
+
+        def wait(self, timeout=None):
+            return 0
+
+    monkeypatch.setattr(browser.subprocess, "Popen", lambda *a, **k: FakeProc())
+    monkeypatch.setattr(browser, "_wait_cdp", lambda port, timeout: True)
+    monkeypatch.setattr(browser, "_running_for", lambda d: 0)
+    monkeypatch.setattr(browser.time, "sleep", lambda s: None)
+    profile = str(tmp_path / "p")
+    entered = threading.Event()
+
+    def second():
+        with browser.managed_browser("/bin/true", profile):
+            entered.set()
+
+    with browser.managed_browser("/bin/true", profile):
+        t = threading.Thread(target=second)
+        t.start()
+        assert not entered.wait(0.5)  # blocked while the first browser is up
+    t.join(5)
+    assert entered.is_set()
+
+
 def test_managed_browser_tears_down_on_error(monkeypatch, tmp_path):
     class FakeProc:
         pid = 1
