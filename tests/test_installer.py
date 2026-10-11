@@ -43,11 +43,48 @@ def test_compose_statusline_wraps_existing(tmp_path):
 
 def test_detect_clients(tmp_path, monkeypatch):
     monkeypatch.setattr(installer.shutil, "which", lambda _x: None)
-    assert installer.detect_clients(tmp_path) == {"claude": False, "codex": False}
+    assert installer.detect_clients(tmp_path) == {
+        "claude": False,
+        "codex": False,
+        "opencode": False,
+    }
     (tmp_path / ".claude.json").write_text("{}")
     (tmp_path / ".codex").mkdir()
+    (tmp_path / ".config" / "opencode").mkdir(parents=True)
     d = installer.detect_clients(tmp_path)
-    assert d["claude"] and d["codex"]
+    assert d["claude"] and d["codex"] and d["opencode"]
+
+
+def test_ensure_opencode_creates_and_is_idempotent(tmp_path):
+    p = installer.opencode_config(tmp_path)
+    assert p.name == "opencode.json"
+    assert "registered" in installer.ensure_opencode(p)
+    data = json.loads(p.read_text())
+    assert data["mcp"]["net-sift"] == {
+        "type": "local",
+        "command": ["net-sift", "serve"],
+        "enabled": True,
+    }
+    assert "already present" in installer.ensure_opencode(p)
+
+
+def test_ensure_opencode_keeps_existing_jsonc_settings(tmp_path):
+    base = tmp_path / ".config" / "opencode"
+    base.mkdir(parents=True)
+    (base / "opencode.jsonc").write_text('{"plugin": ["x"], "mcp": {"other": {"type": "remote"}}}')
+    p = installer.opencode_config(tmp_path)
+    assert p.name == "opencode.jsonc"
+    installer.ensure_opencode(p)
+    data = json.loads(p.read_text())
+    assert data["plugin"] == ["x"] and set(data["mcp"]) == {"other", "net-sift"}
+
+
+def test_ensure_opencode_leaves_commented_config_alone(tmp_path):
+    p = tmp_path / "opencode.jsonc"
+    original = '{\n  // my notes\n  "plugin": []\n}\n'
+    p.write_text(original)
+    assert "skipped" in installer.ensure_opencode(p)
+    assert p.read_text() == original
 
 
 def test_run_wizard_all_present(tmp_path, monkeypatch, capsys):

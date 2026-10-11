@@ -20,3 +20,35 @@ def test_render_runs(monkeypatch):
     text = doctor.render(probe=False)
     assert "net-sift doctor" in text
     assert "browser" in text
+
+
+def test_probe_does_not_wait_for_a_stuck_source(monkeypatch):
+    import threading
+
+    release = threading.Event()
+
+    def quick(q, since, until, budget):
+        return [1, 2], False
+
+    def stuck(q, since, until, budget):
+        release.wait(5)
+        return [], False
+
+    def blocked(q, since, until, budget):
+        import urllib.error
+
+        raise urllib.error.HTTPError("u", 429, "Too Many Requests", None, None)
+
+    monkeypatch.setattr(
+        doctor.sources,
+        "SOURCES",
+        {"quick": quick, "stuck": stuck, "blocked": blocked, "telegram": quick},
+    )
+    monkeypatch.setattr(doctor, "PROBE_DEADLINE", 0.2)
+    out = doctor._probe_keyless()
+    release.set()
+    assert out["quick"] == "ok (2)"
+    assert out["stuck"].startswith("slow")
+    assert out["blocked"] == "unreachable: HTTPError 429"
+    assert out["telegram"].startswith("skipped")
+    assert list(out) == ["quick", "stuck", "blocked", "telegram"]

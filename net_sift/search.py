@@ -67,11 +67,27 @@ def default_names(source_map: dict[str, core.Source]) -> list[str]:
     return names + [s for s in live if s in source_map]
 
 
+#: Web sources asked for Telegram channels. Both honor `site:t.me`; Google drops the
+#: operator and answers with ordinary pages.
+TELEGRAM_FINDERS = ("duckduckgo", "brave")
+
+
 def discover_telegram(query: str, source_map: dict[str, core.Source]) -> list[str]:
-    """Telegram has no cross-channel search. Ask Google which public channels cover
+    """Telegram has no cross-channel search. Ask the web which public channels cover
     the topic, so the telegram source has a channel list to read."""
-    recs, _ = source_map["google"](sources.TELEGRAM_DISCOVERY.format(query=query), None, None, 10)
-    return sources.telegram_channels(str(r.get("url") or "") for r in recs)
+    q = sources.TELEGRAM_DISCOVERY.format(query=query)
+    urls: list[str] = []
+    failed: Exception | None = None
+    for name in TELEGRAM_FINDERS:
+        try:
+            recs, _ = source_map[name](q, None, None, 20)
+        except Exception as e:
+            failed = e
+            continue
+        urls += [str(r.get("url") or "") for r in recs]
+    if failed and not urls:
+        raise failed
+    return sources.telegram_channels(urls)
 
 
 def _coverage(logs: list[str]) -> dict:
@@ -120,7 +136,11 @@ def deep_search(
 
     # Browser-backed sources (walled + open web + telegram discovery) run inside one
     # managed headless browser, opened once and killed at the end.
-    open_browser = managed is not None and _needs_browser(names, source_map)
+    # Telegram has no search of its own: its channel list comes from a web search, so
+    # a telegram-only sweep needs the browser too.
+    wants_telegram = platforms is None or "telegram" in platforms
+    discover = wants_telegram and not tg_channels and TELEGRAM_FINDERS[0] in source_map
+    open_browser = managed is not None and (discover or _needs_browser(names, source_map))
     cm = (
         browser.managed_browser(managed[0], managed[1])
         if open_browser
@@ -130,8 +150,7 @@ def deep_search(
         if endpoint:
             opencli.set_endpoint(endpoint)
         try:
-            wants_telegram = platforms is None or "telegram" in platforms
-            if not tg_channels and wants_telegram and "google" in source_map:
+            if discover:
                 try:
                     tg_channels = discover_telegram(query, source_map)
                 except Exception as e:  # a failed discovery is a declared gap

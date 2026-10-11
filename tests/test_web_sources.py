@@ -97,15 +97,82 @@ def test_telegram_channels():
     assert sources.telegram_channels(urls) == ["BitcoinBullets", "Cryptocurrency_Inside"]
 
 
-def test_discover_telegram_uses_google():
+def test_discover_telegram_asks_the_site_search_engines():
     seen = []
 
-    def google(query, since, until, budget):
+    def duckduckgo(query, since, until, budget):
         seen.append(query)
         return [{"url": "https://t.me/s/chan_one"}, {"url": "https://bitcoin.org"}], False
 
-    assert search.discover_telegram("bitcoin", {"google": google}) == ["chan_one"]
+    def brave(query, since, until, budget):
+        return [{"url": "https://t.me/chan_two"}, {"url": "https://t.me/s/chan_one"}], False
+
+    found = search.discover_telegram("bitcoin", {"duckduckgo": duckduckgo, "brave": brave})
+    assert found == ["chan_one", "chan_two"]
     assert seen == ["site:t.me subscribers bitcoin"]
+
+
+def test_discover_telegram_survives_one_engine_failing():
+    def broken(query, since, until, budget):
+        raise RuntimeError("blocked")
+
+    def brave(query, since, until, budget):
+        return [{"url": "https://t.me/chan_two"}], False
+
+    assert search.discover_telegram("x", {"duckduckgo": broken, "brave": brave}) == ["chan_two"]
+    with pytest.raises(RuntimeError):
+        search.discover_telegram("x", {"duckduckgo": broken, "brave": broken})
+
+
+def test_google_redirect_links_are_unwrapped(monkeypatch):
+    monkeypatch.setattr(opencli, "warm_google", lambda q, **k: None)
+    monkeypatch.setattr(
+        opencli,
+        "run",
+        lambda *a, **k: [
+            {"title": "a", "url": "https://www.google.com/goto?url=AAA"},
+            {"title": "b", "url": "https://example.org/b"},
+        ],
+    )
+    asked = []
+
+    def fake_unwrap(url):
+        asked.append(url)
+        return "https://example.org/a"
+
+    monkeypatch.setattr(opencli, "_unwrap_google", fake_unwrap)
+    recs, _ = opencli.make_source("google", "search")("q", None, None, 10)
+    assert [r["url"] for r in recs] == ["https://example.org/a", "https://example.org/b"]
+    assert recs[0]["id"] == "google:https://example.org/a"  # stable across runs
+    assert asked == ["https://www.google.com/goto?url=AAA"]
+
+
+def test_google_is_rewarmed_only_when_blocked(monkeypatch):
+    warmed, calls = [], []
+    monkeypatch.setattr(opencli, "warm_google", lambda q, **k: warmed.append(k.get("again", False)))
+    monkeypatch.setattr(opencli.time, "sleep", lambda s: None)
+
+    def run(*a, **k):
+        calls.append(1)
+        if len(calls) == 1:
+            raise opencli.OpenCLIUnavailable("opencli google search exit 1: code: NOT_FOUND")
+        return [{"title": "a", "url": "https://example.org/a"}]
+
+    monkeypatch.setattr(opencli, "run", run)
+    monkeypatch.setattr(opencli, "google_blocked", lambda: True)
+    recs, _ = opencli.make_source("google", "search")("q", None, None, 10)
+    assert len(recs) == 1 and warmed == [False, True]
+
+    # An honest empty result (no /sorry/ tab) is not retried.
+    calls.clear()
+    monkeypatch.setattr(opencli, "google_blocked", lambda: False)
+    monkeypatch.setattr(
+        opencli,
+        "run",
+        lambda *a, **k: (_ for _ in ()).throw(opencli.OpenCLIUnavailable("code: NOT_FOUND")),
+    )
+    with pytest.raises(opencli.OpenCLIUnavailable):
+        opencli.make_source("google", "search")("q", None, None, 10)
 
 
 def test_brave_pages_until_exhausted(monkeypatch):

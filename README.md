@@ -104,9 +104,9 @@ net-sift install                # guided; add --yes for unattended
 
 `net-sift install` is a wizard. It:
 
-- registers the MCP server and a status bar with the clients it finds (Claude Code,
-  Codex), adding a `[NET-SIFT]` line below any status bar you already have rather
-  than replacing it;
+- registers the MCP server with the clients it finds (Claude Code, Codex, opencode)
+  and a status bar in Claude Code, adding a `[NET-SIFT]` line below any status bar
+  you already have rather than replacing it;
 - installs OpenCLI through npm with your consent;
 - detects your Chromium browsers, shows which sites each is already logged into, and,
   with your consent, copies the one you pick into net-sift's managed area so searches
@@ -118,13 +118,6 @@ net-sift install                # guided; add --yes for unattended
 
 Every step asks before it changes anything. Add an account later with
 `net-sift login <site>`. Restart your client afterward so it picks up the server.
-
-The wizard does not register opencode. Add the server to
-`~/.config/opencode/opencode.jsonc` yourself:
-
-```json
-"mcp": { "net-sift": { "type": "local", "command": ["net-sift", "serve"], "enabled": true } }
-```
 
 macOS only for now; Windows and Linux are planned.
 

@@ -8,7 +8,8 @@ reports the chosen browser and which sites that profile is signed into.
 from __future__ import annotations
 
 import shutil
-from concurrent.futures import ThreadPoolExecutor
+import threading
+import time
 from datetime import datetime, timedelta, timezone
 
 from . import config
@@ -80,23 +81,37 @@ def _node_version() -> str:
         return "installed"
 
 
+#: Seconds a source gets to answer the probe. A throttled host can spend a minute
+#: backing off; the report says so and moves on.
+PROBE_DEADLINE = 20
+
+
 def _probe_keyless() -> dict:
     now = datetime.now(timezone.utc)
+    out: dict[str, str] = {}
 
-    def probe(item) -> str:
-        name, fn = item
-        if name == "telegram":  # needs channels; skip in a generic probe
-            return "skipped (needs --channels)"
+    def probe(name: str, fn) -> None:
         try:
             recs, _ = fn("test", now - timedelta(days=30), now, 3)
-            return f"ok ({len(recs)})"
+            out[name] = f"ok ({len(recs)})"
         except Exception as e:
-            return f"unreachable: {type(e).__name__}"
+            code = getattr(e, "code", None)
+            out[name] = f"unreachable: {type(e).__name__}" + (f" {code}" if code else "")
 
-    # Concurrent: one slow or blocked source otherwise holds up the whole report.
-    items = list(sources.SOURCES.items())
-    with ThreadPoolExecutor(max_workers=len(items)) as ex:
-        return dict(zip(sources.SOURCES, ex.map(probe, items), strict=True))
+    # Concurrent, and daemon threads so a source still retrying cannot hold up the
+    # report or the process exit.
+    threads = []
+    for name, fn in sources.SOURCES.items():
+        if name == "telegram":  # needs channels; skip in a generic probe
+            out[name] = "skipped (needs --channels)"
+            continue
+        threads.append(threading.Thread(target=probe, args=(name, fn), daemon=True))
+        threads[-1].start()
+    deadline = time.time() + PROBE_DEADLINE
+    for t in threads:
+        t.join(max(0.0, deadline - time.time()))
+    slow = f"slow: no answer in {PROBE_DEADLINE}s (throttled or backing off)"
+    return {name: out.get(name, slow) for name in sources.SOURCES}
 
 
 def _guidance(managed: dict, sites: dict) -> str:

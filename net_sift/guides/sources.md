@@ -19,7 +19,8 @@
 | `marginalia` | independent index of the small, non-commercial web | undated; in the default sweep only with `MARGINALIA_API_KEY` |
 
 `telegram` needs a channel list. Pass one, or connect a browser: net-sift then asks
-Google for `site:t.me subscribers <query>` and reads the channels it finds.
+DuckDuckGo and Brave for `site:t.me subscribers <query>` and reads the channels they
+find.
 
 ## Open web (no account, through OpenCLI)
 
@@ -28,7 +29,7 @@ Sources marked *browser* need a connected Chromium session; the rest need only t
 
 | Source | What it covers | Notes |
 |--------|----------------|-------|
-| `google` | general web search | browser; 10 results per query; often CAPTCHA-blocked |
+| `google` | general web search | browser; 10 results per query; ignores `site:` |
 | `brave` | general web search, independent index | browser; up to 18 per query |
 | `duckduckgo` | general web search | browser; up to 10 per query |
 | `google_news` | news headlines | dated |

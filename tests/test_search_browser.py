@@ -72,3 +72,31 @@ def test_browser_choice_roundtrip(tmp_path):
     assert config.get_browser_choice(tmp_path) is None
     config.set_browser_choice(tmp_path, "comet")
     assert config.get_browser_choice(tmp_path) == "comet"
+
+
+def test_telegram_only_sweep_opens_the_browser_for_discovery(monkeypatch, tmp_path):
+    opened = []
+
+    @contextlib.contextmanager
+    def fake_managed(exe, prof, headed=False, timeout=30):
+        opened.append(prof)
+        yield "http://127.0.0.1:1234"
+
+    monkeypatch.setattr(search, "_managed_profile", lambda: ("/bin/true", str(tmp_path / "p")))
+    monkeypatch.setattr(search.browser, "managed_browser", fake_managed)
+    monkeypatch.setattr(search.opencli, "binary", lambda: "/usr/bin/opencli")
+    monkeypatch.setattr(search, "discover_telegram", lambda q, smap: ["chan_one"])
+    seen = {}
+
+    def fake_run(query, source_map, names, *a, **k):
+        seen["names"] = names
+        return [], []
+
+    monkeypatch.setattr(search.core, "run", fake_run)
+    monkeypatch.setattr(
+        search.sessions,
+        "save",
+        lambda *a, **k: {"id": "s", "count": 0, "sources": {}, "corpus": "c"},
+    )
+    search.deep_search("q", platforms=["telegram"])
+    assert opened and seen["names"] == ["telegram"]

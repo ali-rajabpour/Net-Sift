@@ -25,6 +25,7 @@ from . import config
 from .access import browser, browsers, opencli, profile
 
 MCP_ENTRY = {"command": "net-sift", "args": ["serve"]}
+OPENCODE_ENTRY = {"type": "local", "command": ["net-sift", "serve"], "enabled": True}
 NODE_MIN = (20, 18, 1)
 OPENCLI_NPM = "@jackwener/opencli"
 
@@ -146,8 +147,8 @@ def compose_statusline(path: Path, home: Path, ui: _UI) -> str:
 
 def ensure_codex(path: Path) -> str:
     """Add [mcp_servers.net-sift] to a Codex config.toml without rewriting the file."""
-    # Codex drops a tool call after 60 s by default; a sweep, or one queued behind
-    # another sweep's browser, runs longer.
+    # Codex drops a tool call after 300 s by default; a full sweep queued behind
+    # another sweep's browser can run longer.
     header, limit = "[mcp_servers.net-sift]", "tool_timeout_sec = 1800"
     block = f'\n{header}\ncommand = "net-sift"\nargs = ["serve"]\n{limit}\n'
     existing = path.read_text(encoding="utf-8") if path.exists() else ""
@@ -162,6 +163,31 @@ def ensure_codex(path: Path) -> str:
     return f"registered MCP in {path}"
 
 
+def opencode_config(home: Path) -> Path:
+    """opencode's global config: whichever of opencode.jsonc / opencode.json exists."""
+    base = home / ".config" / "opencode"
+    jsonc = base / "opencode.jsonc"
+    return jsonc if jsonc.exists() else base / "opencode.json"
+
+
+def ensure_opencode(path: Path) -> str:
+    """Add the net-sift MCP server to an opencode config."""
+    data: dict = {"$schema": "https://opencode.ai/config.json"}
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except ValueError:
+            # A .jsonc with comments; rewriting it would drop them.
+            return f"skipped {path} (has comments or is not valid JSON; add net-sift manually)"
+    servers = data.setdefault("mcp", {})
+    if servers.get("net-sift") == OPENCODE_ENTRY:
+        return f"already present in {path}"
+    servers["net-sift"] = OPENCODE_ENTRY
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return f"registered MCP in {path}"
+
+
 def detect_clients(home: Path) -> dict[str, bool]:
     """Which MCP clients look installed on this machine."""
     return {
@@ -169,6 +195,8 @@ def detect_clients(home: Path) -> dict[str, bool]:
         or (home / ".claude").exists()
         or shutil.which("claude") is not None,
         "codex": (home / ".codex").exists() or shutil.which("codex") is not None,
+        "opencode": (home / ".config" / "opencode").exists()
+        or shutil.which("opencode") is not None,
     }
 
 
@@ -412,6 +440,12 @@ def _setup_clients(ui: _UI, home: Path) -> None:
         ui.info("Codex not detected.")
         if ui.confirm("Register for Codex anyway?", default=False):
             ui.ok(ensure_codex(home / ".codex" / "config.toml"))
+    if found["opencode"]:
+        ui.ok(ensure_opencode(opencode_config(home)))
+    else:
+        ui.info("opencode not detected.")
+        if ui.confirm("Register for opencode anyway?", default=False):
+            ui.ok(ensure_opencode(opencode_config(home)))
 
 
 def _ensure_node(ui: _UI) -> bool:

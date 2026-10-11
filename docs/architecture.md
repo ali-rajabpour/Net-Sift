@@ -44,7 +44,7 @@ report records anything that still could not be reached.
   summaries, paths, errors, and questions, never the raw corpus.
 - `doctor.py` and `status.py` report what is reachable.
 - `cli.py` serves the MCP, runs the doctor, prints status, and installs the server
-  and status bar into Claude Code and Codex.
+  into Claude Code, Codex, and opencode.
 
 ## Design rules
 

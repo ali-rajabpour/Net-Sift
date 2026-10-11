@@ -58,13 +58,9 @@ def test_ensure_codex_raises_timeout_on_existing_entry(tmp_path):
         "[mcp_servers.other]\ntool_timeout_sec = 5\n"
     )
     assert "raised" in cli.ensure_codex(p)
-    import tomllib
-
-    servers = tomllib.loads(p.read_text())["mcp_servers"]
-    assert servers["net-sift"] == {
-        "command": "net-sift",
-        "args": ["serve"],
-        "tool_timeout_sec": 1800,
-    }
-    assert servers["other"] == {"tool_timeout_sec": 5}
+    # No tomllib here: the suite still runs on Python 3.10.
+    assert p.read_text() == (
+        '[mcp_servers.net-sift]\ntool_timeout_sec = 1800\ncommand = "net-sift"\n'
+        'args = ["serve"]\n\n[mcp_servers.other]\ntool_timeout_sec = 5\n'
+    )
     assert "already present" in cli.ensure_codex(p)

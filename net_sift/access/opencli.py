@@ -23,10 +23,14 @@ import shutil
 import subprocess
 import threading
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 
-from ..engine.core import Record, parse_iso, rec
+from ..engine.core import UA, Record, parse_iso, rec
 
 OPENCLI_BIN = os.environ.get("NET_SIFT_OPENCLI_BIN", "opencli")
 
@@ -99,6 +103,93 @@ _run_lock = threading.Lock()
 def set_endpoint(url: str | None) -> None:
     global _ENDPOINT
     _ENDPOINT = url
+
+
+# --- Google quirks ----------------------------------------------------------
+
+#: Endpoint whose browser has already cleared Google's JavaScript check.
+_google_ready: str | None = None
+_GOOGLE_REDIRECT = "https://www.google.com/goto?"
+
+
+def _tabs(endpoint: str) -> list[dict]:
+    with urllib.request.urlopen(f"{endpoint}/json/list", timeout=5) as r:
+        return json.load(r)
+
+
+def google_blocked() -> bool:
+    """True when a tab of the managed browser sits on Google's /sorry/ page."""
+    try:
+        return any("google.com/sorry/" in t.get("url", "") for t in _tabs(_ENDPOINT or ""))
+    except (OSError, ValueError):
+        return False
+
+
+def warm_google(query: str, wait: float = 12.0, again: bool = False) -> None:
+    """Load one Google results page in a plain tab before the adapter runs.
+
+    A browser that has not yet passed Google's JavaScript check gets the /sorry/
+    page when OpenCLI navigates with the debugger attached, and the adapter reports
+    NOT_FOUND. Letting the check run to its end in a tab nobody is attached to
+    clears it for the rest of this browser's life. Once per launch.
+    """
+    global _google_ready
+    endpoint = _ENDPOINT
+    if not endpoint or (_google_ready == endpoint and not again):
+        return
+    # /json/new takes the target URL as its whole query string.
+    url = "https://www.google.com/search?" + urllib.parse.urlencode({"q": query})
+    req = urllib.request.Request(f"{endpoint}/json/new?{url}", method="PUT")
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            tab = json.load(r)["id"]
+        deadline = time.time() + wait
+        while time.time() < deadline:
+            time.sleep(0.5)
+            page = next((t for t in _tabs(endpoint) if t.get("id") == tab), None)
+            if page is None:
+                break
+            # The check runs on a page titled "Google Search" (or its own URL), then
+            # redirects: to /sorry/ the first time, to results (sei=) after that. A
+            # session that is already clear goes straight to "<query> - Google ...".
+            title, where = page.get("title", ""), page.get("url", "")
+            settled = title and title != "Google Search" and "google.com" not in title
+            if "/sorry/" in where or "sei=" in where or settled:
+                break
+        with urllib.request.urlopen(f"{endpoint}/json/close/{tab}", timeout=5):
+            pass
+    except (OSError, ValueError, KeyError):
+        return  # the adapter still runs and reports what it sees
+    _google_ready = endpoint
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None
+
+
+def _unwrap_google(url: str) -> str:
+    """Google can return result links as opaque /goto?url= redirects. The target is
+    in the Location header of a plain request; an unresolved link is kept as is."""
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    try:
+        urllib.request.build_opener(_NoRedirect).open(req, timeout=10).close()
+    except urllib.error.HTTPError as e:
+        return e.headers.get("Location") or url
+    except OSError:
+        pass
+    return url
+
+
+def unwrap_google(items: list[dict]) -> None:
+    """Replace Google redirect links in `items` with the pages they point to."""
+    wrapped = [x for x in items if str(x.get("url") or "").startswith(_GOOGLE_REDIRECT)]
+    if not wrapped:
+        return
+    with ThreadPoolExecutor(max_workers=len(wrapped)) as ex:
+        targets = ex.map(_unwrap_google, (x["url"] for x in wrapped))
+        for item, target in zip(wrapped, targets, strict=True):
+            item["url"] = target
 
 
 def current_endpoint() -> str | None:
@@ -310,16 +401,27 @@ def make_source(site: str, command: str, name: str | None = None, max_limit: int
     name = name or site
 
     def source(query, since, until, budget):
+        google_web = (site, command) == ("google", "search")
+        if google_web:
+            warm_google(query)
         for attempt in range(3):
             try:
                 payload = run(site, command, query, limit=min(budget, max_limit))
                 break
             except OpenCLIUnavailable as e:
-                if not any(t in str(e).lower() for t in _TRANSIENT) or attempt == 2:
+                # Google's check does not always clear on the first pass. Only a
+                # /sorry/ tab counts: an honest empty result is not retried.
+                blocked = google_web and "NOT_FOUND" in str(e) and google_blocked()
+                if attempt == 2 or not (blocked or any(t in str(e).lower() for t in _TRANSIENT)):
                     raise
+                if blocked:
+                    warm_google(query, again=True)
                 time.sleep(2)
+        items = _items(payload)[:budget]
+        if google_web:
+            unwrap_google(items)
         out: list[Record] = []
-        for item in _items(payload)[:budget]:
+        for item in items:
             r = normalize(item, name)
             if not r:
                 continue

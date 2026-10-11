@@ -21,11 +21,29 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Long calls timed out in clients that drop a tool call after 60 s of silence
   (opencode). `deep_search`, `resume`, `doctor`, and `darkweb_search` now send MCP
   progress notifications while they work.
-- Codex drops a tool call after 60 s regardless. `net-sift install` now writes
-  `tool_timeout_sec = 1800` for the Codex entry and adds it to an existing one.
+- Codex drops a tool call after 300 s by default, which a full sweep queued behind
+  another can exceed. `net-sift install` now writes `tool_timeout_sec = 1800` for the
+  Codex entry and adds it to an existing one.
 - `doctor(probe=True)` probed the keyless sources one after another and could run
-  past a minute. It probes them concurrently.
+  past a minute. It probes them concurrently and gives each 20 s; a source still
+  backing off is reported as slow instead of holding up the report.
 - A platform named twice in `platforms` ran twice and reported its gap twice.
+- `google` failed with `NOT_FOUND` on the first search of a browser session: Google
+  serves its `/sorry/` page until its JavaScript check has run once. net-sift now runs
+  that check in a plain tab before the first Google search and again if a search is
+  still blocked.
+- `google` results carried opaque `google.com/goto?url=` redirects instead of the
+  pages they point to. They are resolved to the real URLs, so records link to their
+  source and keep a stable id across runs.
+- Telegram channel discovery found nothing: Google ignores `site:t.me`. Discovery now
+  asks DuckDuckGo and Brave, which honor it.
+- A sweep that named only `telegram` never opened the browser, so discovery could not
+  run and the sweep failed with `no channel list`.
+
+### Added
+
+- `net-sift install` registers the MCP server with opencode
+  (`~/.config/opencode/opencode.jsonc` or `opencode.json`).
 
 ## [1.2.2] - 2026-10-04
 
