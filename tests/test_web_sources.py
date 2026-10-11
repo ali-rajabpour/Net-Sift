@@ -379,3 +379,28 @@ def test_warm_google_keeps_other_commands_out_while_its_tab_is_open(monkeypatch)
     finally:
         opencli.set_endpoint(None)
         opencli._google_ready = None
+
+
+def test_brave_bot_check_is_a_gap_not_an_empty_result(monkeypatch):
+    monkeypatch.setattr(opencli, "run", lambda *a, **k: [])
+    monkeypatch.setattr(opencli, "brave_blocked", lambda: True)
+    with pytest.raises(opencli.OpenCLIUnavailable, match="bot check"):
+        opencli.make_source("brave", "search")("q", None, None, 10)
+
+    # No challenge page: the query simply matched nothing.
+    monkeypatch.setattr(opencli, "brave_blocked", lambda: False)
+    assert opencli.make_source("brave", "search")("q", None, None, 10) == ([], False)
+
+
+def test_brave_blocked_reads_the_challenge_tab(monkeypatch):
+    opencli.set_endpoint("http://127.0.0.1:1")
+    try:
+        url = "https://search.brave.com/search?q=q"
+        monkeypatch.setattr(opencli, "_tabs", lambda ep: [{"title": "Brave Search", "url": url}])
+        assert opencli.brave_blocked() is True
+        monkeypatch.setattr(
+            opencli, "_tabs", lambda ep: [{"title": "q - Brave Search", "url": url}]
+        )
+        assert opencli.brave_blocked() is False
+    finally:
+        opencli.set_endpoint(None)

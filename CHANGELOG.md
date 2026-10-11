@@ -6,6 +6,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.2.5] - 2026-10-11
+
+### Fixed
+
+- `brave` reported `0 records` when Brave answered with its bot check ("Verifying
+  you're not a bot"); the adapter calls that an empty result. It is now a declared
+  gap, so a blocked source no longer looks like a search that matched nothing.
+
 ## [1.2.4] - 2026-10-11
 
 ### Fixed

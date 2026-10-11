@@ -126,6 +126,20 @@ def google_blocked() -> bool:
         return False
 
 
+def brave_blocked() -> bool:
+    """True when Brave answered a search with its bot check ("Verifying you're not a
+    bot"). That page keeps the bare site title; a results page is titled after the
+    query. The adapter reports it as an empty result."""
+    try:
+        return any(
+            t.get("url", "").startswith("https://search.brave.com/search")
+            and t.get("title") == "Brave Search"
+            for t in _tabs(_ENDPOINT or "")
+        )
+    except (OSError, ValueError):
+        return False
+
+
 def warm_google(query: str, wait: float = 12.0, again: bool = False) -> None:
     """Load one Google results page in a plain tab before the adapter runs.
 
@@ -419,6 +433,11 @@ def make_source(site: str, command: str, name: str | None = None, max_limit: int
                     except OpenCLIUnavailable as e:
                         blocked = google_web and "NOT_FOUND" in str(e) and google_blocked()
                         raise
+                    # A bot check is a gap to declare, not zero results.
+                    if site == "brave" and not _items(payload) and brave_blocked():
+                        raise OpenCLIUnavailable(
+                            "brave search: blocked by Brave's bot check; it lifts on its own"
+                        )
                 break
             except OpenCLIUnavailable as e:
                 # Google challenges some searches even after the warm-up. Only a
