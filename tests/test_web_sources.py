@@ -335,3 +335,47 @@ def test_telegram_honors_window_and_never_bisects(monkeypatch):
     assert [r["url"] for r in recs] == ["https://t.me/chan/1"] and ceiling is False
     with pytest.raises(RuntimeError):
         sources.src_telegram("bitcoin etf", SINCE, UNTIL, 100, [])
+
+
+def test_warm_google_keeps_other_commands_out_while_its_tab_is_open(monkeypatch):
+    import io
+    import threading
+
+    held = []
+
+    def other_thread_can_run() -> bool:
+        got = []
+
+        def attempt():
+            got.append(opencli._run_lock.acquire(blocking=False))
+            if got[0]:
+                opencli._run_lock.release()
+
+        t = threading.Thread(target=attempt)
+        t.start()
+        t.join()
+        return got[0]
+
+    def fake_urlopen(req, timeout=None):
+        held.append(not other_thread_can_run())
+        return io.BytesIO(b'{"id": "tab1"}')
+
+    monkeypatch.setattr(opencli.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(
+        opencli,
+        "_tabs",
+        lambda ep: [
+            {"id": "tab1", "title": "q - Google Search", "url": "https://www.google.com/search?q=q"}
+        ],
+    )
+    monkeypatch.setattr(opencli.time, "sleep", lambda s: None)
+    opencli.set_endpoint("http://127.0.0.1:1")
+    try:
+        opencli.warm_google("q")
+        assert held == [True, True]  # opening and closing the tab
+        assert other_thread_can_run() is True
+        opencli.warm_google("q")  # once per browser launch
+        assert len(held) == 2
+    finally:
+        opencli.set_endpoint(None)
+        opencli._google_ready = None

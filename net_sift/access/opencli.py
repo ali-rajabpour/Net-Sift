@@ -97,7 +97,8 @@ def binary() -> str | None:
 #: that browser when this is set; sources are no-ops otherwise.
 _ENDPOINT: str | None = None
 #: One OpenCLI call at a time per endpoint: concurrent calls crash the shared page.
-_run_lock = threading.Lock()
+#: Reentrant so a caller can hold it across a call and a look at the tab it left.
+_run_lock = threading.RLock()
 
 
 def set_endpoint(url: str | None) -> None:
@@ -141,23 +142,26 @@ def warm_google(query: str, wait: float = 12.0, again: bool = False) -> None:
     url = "https://www.google.com/search?" + urllib.parse.urlencode({"q": query})
     req = urllib.request.Request(f"{endpoint}/json/new?{url}", method="PUT")
     try:
-        with urllib.request.urlopen(req, timeout=10) as r:
-            tab = json.load(r)["id"]
-        deadline = time.time() + wait
-        while time.time() < deadline:
-            time.sleep(0.5)
-            page = next((t for t in _tabs(endpoint) if t.get("id") == tab), None)
-            if page is None:
-                break
-            # The check runs on a page titled "Google Search" (or its own URL), then
-            # redirects: to /sorry/ the first time, to results (sei=) after that. A
-            # session that is already clear goes straight to "<query> - Google ...".
-            title, where = page.get("title", ""), page.get("url", "")
-            settled = title and title != "Google Search" and "google.com" not in title
-            if "/sorry/" in where or "sei=" in where or settled:
-                break
-        with urllib.request.urlopen(f"{endpoint}/json/close/{tab}", timeout=5):
-            pass
+        # No OpenCLI command may run while this tab exists: a command can attach
+        # to it, and closing it then cuts that command's CDP connection.
+        with _run_lock:
+            with urllib.request.urlopen(req, timeout=10) as r:
+                tab = json.load(r)["id"]
+            deadline = time.time() + wait
+            while time.time() < deadline:
+                time.sleep(0.5)
+                page = next((t for t in _tabs(endpoint) if t.get("id") == tab), None)
+                if page is None:
+                    break
+                # The check runs on a page titled "Google Search" (or its own URL), then
+                # redirects: to /sorry/ the first time, to results (sei=) after that. A
+                # session that is already clear goes straight to "<query> - Google ...".
+                title, where = page.get("title", ""), page.get("url", "")
+                settled = title and title != "Google Search" and "google.com" not in title
+                if "/sorry/" in where or "sei=" in where or settled:
+                    break
+            with urllib.request.urlopen(f"{endpoint}/json/close/{tab}", timeout=5):
+                pass
     except (OSError, ValueError, KeyError):
         return  # the adapter still runs and reports what it sees
     _google_ready = endpoint
@@ -405,13 +409,20 @@ def make_source(site: str, command: str, name: str | None = None, max_limit: int
         if google_web:
             warm_google(query)
         for attempt in range(3):
+            blocked = False
             try:
-                payload = run(site, command, query, limit=min(budget, max_limit))
+                # Held across the call and the tab check: OpenCLI shares one tab, and
+                # the next source's command would navigate it away from /sorry/.
+                with _run_lock:
+                    try:
+                        payload = run(site, command, query, limit=min(budget, max_limit))
+                    except OpenCLIUnavailable as e:
+                        blocked = google_web and "NOT_FOUND" in str(e) and google_blocked()
+                        raise
                 break
             except OpenCLIUnavailable as e:
-                # Google's check does not always clear on the first pass. Only a
+                # Google challenges some searches even after the warm-up. Only a
                 # /sorry/ tab counts: an honest empty result is not retried.
-                blocked = google_web and "NOT_FOUND" in str(e) and google_blocked()
                 if attempt == 2 or not (blocked or any(t in str(e).lower() for t in _TRANSIENT)):
                     raise
                 if blocked:

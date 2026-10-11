@@ -6,6 +6,19 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.2.4] - 2026-10-11
+
+### Fixed
+
+- 1.2.3 opened its Google warm-up tab while other sources' OpenCLI commands were
+  running. A command could attach to that tab, and closing it cut the command's
+  connection (`Pre-navigation ... failed: CDP connection is not open` on `youtube` or
+  `medium` in most mixed sweeps). The warm-up now holds the OpenCLI lock for the life
+  of its tab.
+- Google still challenges an occasional search after the warm-up, and the check for
+  that ran after another source had already reused the tab, so the search was not
+  retried. The check now happens before the tab is released.
+
 ## [1.2.3] - 2026-10-11
 
 ### Fixed
