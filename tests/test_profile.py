@@ -38,5 +38,21 @@ def test_logged_in_reads_names_only(tmp_path):
     assert st["zhihu"] is False
 
 
+def test_auth_stamp_newest_auth_cookie(tmp_path):
+    prof = tmp_path / "p"
+    db = prof / "Default" / "Cookies"
+    db.parent.mkdir(parents=True)
+    c = sqlite3.connect(db)
+    c.execute("create table cookies (host_key text, name text, creation_utc integer)")
+    c.executemany(
+        "insert into cookies values (?,?,?)",
+        [(".x.com", "auth_token", 10), (".x.com", "ct0", 20), (".x.com", "other", 99)],
+    )
+    c.commit()
+    c.close()
+    assert profile.auth_stamp(str(prof), "twitter") == 20
+    assert profile.auth_stamp(str(prof), "reddit") is None
+
+
 def test_logged_in_missing_db(tmp_path):
     assert profile.logged_in(str(tmp_path / "none")) == {k: False for k in profile.AUTH_COOKIES}

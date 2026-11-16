@@ -69,24 +69,40 @@ def _cookie_db(profile_dir: Path) -> Path | None:
     return None
 
 
-def logged_in(profile_dir: str) -> dict[str, bool]:
-    """Per-site logged-in flags, read from cookie names only. Tolerant of a missing
-    or browser-locked Cookies DB (returns all False rather than raising)."""
-    out = {site: False for site in AUTH_COOKIES}
+def _rows(profile_dir: str, sql: str) -> list | None:
+    """Run a read-only query on the profile's Cookies DB; None if missing or unreadable."""
     db = _cookie_db(Path(profile_dir))
     if not db:
-        return out
+        return None
     # Copy first: the live DB may be WAL-locked by a running browser.
     tmp = Path(tempfile.gettempdir()) / f"netsift-ck-{os.getpid()}.db"
     try:
         shutil.copy2(db, tmp)
         con = sqlite3.connect(f"file:{tmp}?mode=ro", uri=True)
-        names = {(h, n) for h, n in con.execute("select host_key, name from cookies")}
+        rows = con.execute(sql).fetchall()
         con.close()
+        return rows
     except (OSError, sqlite3.Error):
-        return out
+        return None
     finally:
         tmp.unlink(missing_ok=True)
-    for site, (host, cookie_names) in AUTH_COOKIES.items():
-        out[site] = any(h.endswith(host) and n in cookie_names for h, n in names)
-    return out
+
+
+def logged_in(profile_dir: str) -> dict[str, bool]:
+    """Per-site flags for an auth cookie being present, read from cookie names only.
+    Presence is not a working session: an expired cookie stays until replaced.
+    Tolerant of a missing or browser-locked Cookies DB (returns all False)."""
+    names = set(_rows(profile_dir, "select host_key, name from cookies") or ())
+    return {
+        site: any(h.endswith(host) and n in cookie_names for h, n in names)
+        for site, (host, cookie_names) in AUTH_COOKIES.items()
+    }
+
+
+def auth_stamp(profile_dir: str, site: str) -> int | None:
+    """Newest creation time of the site's auth cookies, or None when absent. A fresh
+    sign-in rewrites the cookie, so a changed stamp means the user logged in again."""
+    host, cookie_names = AUTH_COOKIES[site]
+    rows = _rows(profile_dir, "select host_key, name, creation_utc from cookies") or ()
+    stamps = [c for h, n, c in rows if h.endswith(host) and n in cookie_names]
+    return max(stamps) if stamps else None

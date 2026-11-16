@@ -302,8 +302,9 @@ def _classify(err: str) -> str:
     if "timeout" in low or "timed out" in low:
         return "timeout"
     if (
+        # COMMAND_EXEC alone is not a block: OpenCLI also uses it for adapter
+        # failures such as an HTTP 404 from a changed site route.
         "navigation rejected" in low
-        or "command_exec" in low
         or "pre-navigation" in low
         or "captcha" in low
         or "not_found" in low  # e.g. Google: "No search results found ... check for CAPTCHA"
@@ -394,10 +395,22 @@ def _managed(home: Path) -> tuple[str, str] | None:
     return found["executable"], str(profile.managed_dir(base, bid))
 
 
+def _live(site: str) -> str | None:
+    """Run the site's search once through the current endpoint. None when it works,
+    else the classified failure reason."""
+    try:
+        opencli.make_source(site, "search")("新闻" if site in _ZH_SITES else "news", None, None, 3)
+        return None
+    except Exception as e:
+        return _classify(str(e))
+
+
 def login_sites(home: Path, sites: list[str], ui: _UI, poll: int = 60, interval: int = 3) -> dict:
     """Open the managed profile headed and log into each site in turn, reusing one
-    window. Success is detected from the site's auth cookie appearing. Interactive;
-    returns {site: logged_in}."""
+    window. A site already passing a live search is left alone. Otherwise the login
+    page stays open until the auth cookie is rewritten (an old, expired cookie does
+    not count), then a live search confirms the session. Interactive; returns
+    {site: logged_in}."""
     mp = _managed(home)
     if not mp:
         ui.warn("No managed browser profile yet. Run `net-sift install` first.")
@@ -405,21 +418,41 @@ def login_sites(home: Path, sites: list[str], ui: _UI, poll: int = 60, interval:
     exe, pdir = mp
     results: dict[str, bool] = {}
     with browser.managed_browser(exe, pdir, headed=True) as endpoint:
-        for site in sites:
-            url = LOGIN_URLS.get(site)
-            if not url:
-                results[site] = False
-                continue
-            ui.info(f"Opening {site} login. Sign in; net-sift detects when you are done.")
-            _navigate(endpoint, url)
-            ok = False
-            for _ in range(poll):
-                if profile.logged_in(pdir).get(site):
-                    ok = True
-                    break
-                time.sleep(interval)
-            results[site] = ok
-            ui.ok(f"{site}: logged in") if ok else ui.warn(f"{site}: not detected, skipped")
+        opencli.set_endpoint(endpoint)
+        try:
+            for site in sites:
+                url = LOGIN_URLS.get(site)
+                if not url:
+                    results[site] = False
+                    continue
+                before = profile.auth_stamp(pdir, site)
+                # The live check drives the shared tab, so it runs only before the
+                # login page opens and after sign-in, never while the user types.
+                if before is not None and _live(site) is None:
+                    results[site] = True
+                    ui.ok(f"{site}: already signed in and working")
+                    continue
+                ui.info(f"Opening {site} login. Sign in; net-sift detects when you are done.")
+                _navigate(endpoint, url)
+                renewed = False
+                for _ in range(poll):
+                    stamp = profile.auth_stamp(pdir, site)
+                    if stamp is not None and stamp != before:
+                        renewed = True
+                        break
+                    time.sleep(interval)
+                if not renewed:
+                    results[site] = False
+                    ui.warn(f"{site}: no new sign-in detected, skipped")
+                    continue
+                reason = _live(site)
+                results[site] = reason is None
+                if reason is None:
+                    ui.ok(f"{site}: logged in")
+                else:
+                    ui.warn(f"{site}: signed in, but search still fails ({reason})")
+        finally:
+            opencli.set_endpoint(None)
     return results
 
 

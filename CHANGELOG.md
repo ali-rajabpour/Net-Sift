@@ -6,6 +6,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- `net-sift login` reported a site as logged in as soon as any auth cookie was
+  present, so an expired session closed the window before you could sign in. It
+  now runs a live search first, waits for the auth cookie to be rewritten, and
+  confirms the new session with another search.
+- `doctor` listed sites as "accounts" signed in from cookie presence alone; the
+  line is now `cookies` and points to `net-sift verify` for the live state.
+- Verify and login labelled every OpenCLI `COMMAND_EXEC` failure as "blocked",
+  including adapter errors such as an HTTP 404; those now read as "error".
+
 ## [1.2.5] - 2026-10-11
 
 ### Fixed

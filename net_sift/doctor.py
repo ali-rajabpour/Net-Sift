@@ -146,7 +146,10 @@ def render(probe: bool = False) -> str:
     )
     lines.append(f"opencli  : {d['opencli']}")
     lines.append(f"node     : {d['node']}")
-    lines.append(f"accounts : {', '.join(d['accounts_logged_in']) or 'none signed in'}")
+    lines.append(
+        f"cookies  : {', '.join(d['accounts_logged_in']) or 'none'}"
+        " (auth cookie present; `net-sift verify` checks the session works)"
+    )
     lines.append(f"keyless  : {', '.join(d['keyless_sources'])}")
     lines.append(f"web      : {', '.join(d['web_sources'])}")
     lines.append(f"darkweb  : {d['darkweb']}")
