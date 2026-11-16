@@ -100,9 +100,11 @@ def logged_in(profile_dir: str) -> dict[str, bool]:
 
 
 def auth_stamp(profile_dir: str, site: str) -> int | None:
-    """Newest creation time of the site's auth cookies, or None when absent. A fresh
-    sign-in rewrites the cookie, so a changed stamp means the user logged in again."""
+    """Newest write time of the site's auth cookies, or None when absent. A fresh
+    sign-in rewrites the cookie, so a changed stamp means the user logged in again.
+    last_update_utc, not creation_utc: Chromium keeps the creation time when a site
+    overwrites a cookie in place (e.g. a guest session upgraded on login)."""
     host, cookie_names = AUTH_COOKIES[site]
-    rows = _rows(profile_dir, "select host_key, name, creation_utc from cookies") or ()
+    rows = _rows(profile_dir, "select host_key, name, last_update_utc from cookies") or ()
     stamps = [c for h, n, c in rows if h.endswith(host) and n in cookie_names]
     return max(stamps) if stamps else None

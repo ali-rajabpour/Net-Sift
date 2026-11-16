@@ -43,7 +43,7 @@ def test_auth_stamp_newest_auth_cookie(tmp_path):
     db = prof / "Default" / "Cookies"
     db.parent.mkdir(parents=True)
     c = sqlite3.connect(db)
-    c.execute("create table cookies (host_key text, name text, creation_utc integer)")
+    c.execute("create table cookies (host_key text, name text, last_update_utc integer)")
     c.executemany(
         "insert into cookies values (?,?,?)",
         [(".x.com", "auth_token", 10), (".x.com", "ct0", 20), (".x.com", "other", 99)],
