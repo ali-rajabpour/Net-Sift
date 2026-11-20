@@ -38,6 +38,7 @@ def test_managed_browser_tears_down(monkeypatch, tmp_path):
 
     monkeypatch.setattr(browser.subprocess, "Popen", lambda *a, **k: FakeProc())
     monkeypatch.setattr(browser, "_wait_cdp", lambda port, timeout: True)
+    monkeypatch.setattr(browser, "real_ua", lambda exe: "UA")
     monkeypatch.setattr(
         browser,
         "_running_for",
@@ -60,6 +61,7 @@ def test_managed_browser_is_exclusive_per_profile(monkeypatch, tmp_path):
 
     monkeypatch.setattr(browser.subprocess, "Popen", lambda *a, **k: FakeProc())
     monkeypatch.setattr(browser, "_wait_cdp", lambda port, timeout: True)
+    monkeypatch.setattr(browser, "real_ua", lambda exe: "UA")
     monkeypatch.setattr(browser, "_running_for", lambda d: 0)
     monkeypatch.setattr(browser.time, "sleep", lambda s: None)
     profile = str(tmp_path / "p")
@@ -97,6 +99,7 @@ def test_managed_browser_tears_down_on_error(monkeypatch, tmp_path):
     fp = FakeProc()
     monkeypatch.setattr(browser.subprocess, "Popen", lambda *a, **k: fp)
     monkeypatch.setattr(browser, "_wait_cdp", lambda port, timeout: True)
+    monkeypatch.setattr(browser, "real_ua", lambda exe: "UA")
     monkeypatch.setattr(browser, "_running_for", lambda d: 0)
     with pytest.raises(RuntimeError):
         with browser.managed_browser("/bin/true", str(tmp_path / "p")):

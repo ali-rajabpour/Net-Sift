@@ -60,7 +60,7 @@ Sources marked *browser* need a connected Chromium session; the rest need only t
 | Source | Requires |
 |--------|----------|
 | `twitter` | logged-in Chromium session |
-| `reddit` | logged-in Chromium session |
+| `reddit` | managed profile signed in by hand with `net-sift login reddit` (HTML scrape, not OpenCLI; see below) |
 | `instagram` | logged-in Chromium session |
 | `facebook` | logged-in Chromium session (often blocks automation even so) |
 | `bilibili` | logged-in Chromium session |
@@ -71,6 +71,27 @@ Walled sources become available once net-sift has a managed browser profile (cop
 from your logged-in Chromium during `net-sift install`); searches then run headless
 with the browser closed. See `setup-opencli.md`. Run `net-sift doctor` to see which
 accounts are signed in.
+
+### Reddit
+
+Reddit blocks every JSON endpoint (`/search.json`, `/svc/shreddit/search`, the OAuth
+API) with a 403 "blocked by network security" page, for every client. net-sift
+therefore loads Reddit's HTML search page in the managed browser and reads the
+results from it, with the browser's real user agent. Votes, comment counts, date,
+author, and subreddit come from the search page itself.
+
+Only a session a human signed into by hand works. A fresh profile, or cookies
+copied from another browser that have gone stale ("Prove your humanity"), are
+blocked. Sign in once, by hand, in the managed profile:
+
+```bash
+net-sift login reddit
+```
+
+When the session expires the sweep reports the gap "reddit session blocked/expired";
+run `net-sift login reddit` again and sign in by hand.
+`net-sift doctor --probe` and `net-sift verify` load one search page and report
+`live`, `blocked`, or `needs-login`.
 
 ## Opt-in tools (separate from the sweep)
 

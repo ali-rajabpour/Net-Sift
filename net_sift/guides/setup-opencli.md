@@ -1,8 +1,10 @@
 # Connecting walled platforms with OpenCLI
 
-Net-Sift reaches login-walled platforms (Twitter/X, Reddit, Instagram, Facebook,
-Bilibili, Xiaohongshu, Zhihu, Weibo) and general web search by driving a headless
-Chromium with [OpenCLI](https://github.com/jackwener/opencli). The browser is one
+Net-Sift reaches login-walled platforms (Twitter/X, Instagram, Facebook, Bilibili,
+Xiaohongshu, Zhihu, Weibo) and general web search by driving a headless Chromium
+with [OpenCLI](https://github.com/jackwener/opencli). Reddit uses the same managed
+browser but not OpenCLI: its JSON endpoints are blocked, so net-sift reads its HTML
+search page (see the Reddit section of `sources.md`). The browser is one
 net-sift launches itself from a copy of your logged-in profile, so searches run with
 your normal browser closed and no browser process is left running. Keyless sources
 (Bluesky, Hacker News, GitHub, arXiv, and the rest) need none of this.
@@ -30,7 +32,9 @@ platforms you want in that browser as you normally would.
 ```bash
 net-sift install        # detects your browsers, shows what each is logged into,
                         # and copies the one you pick into ~/.net-sift/profiles/
-net-sift login reddit   # log into anything you are not already signed into
+net-sift login reddit   # log into anything you are not already signed into;
+                        # Reddit needs this sign-in by hand even if your browser
+                        # was already signed in
 ```
 
 The copy holds your session cookies and lives under `~/.net-sift/profiles/` with
@@ -55,4 +59,5 @@ The status bar (after `net-sift install`) shows readiness at a glance.
 - Keep requests spaced out. High-frequency sweeps can trigger platform rate limits
   or captchas that no tool can bypass.
 - Sessions expire. When a site that was signed in starts returning an auth error,
-  re-run `net-sift login <site>`.
+  re-run `net-sift login <site>`. For Reddit the gap reads "reddit session
+  blocked/expired"; the fix is the same.

@@ -29,8 +29,9 @@ Net-Sift is an MCP server. Call its tools; do not reinvent the retrieval.
 ## Rules
 
 1. Run `doctor` first when the task needs a walled platform (X, Reddit, Instagram,
-   Facebook, Bilibili, Xiaohongshu). If it is not connected, tell the user to open
-   a Chromium browser with the OpenCLI extension and log in, then stop.
+   Facebook, Bilibili, Xiaohongshu). If it is not connected, tell the user to run
+   `net-sift login <site>` and sign in, then stop. A Reddit gap "session
+   blocked/expired" has the same fix: `net-sift login reddit`, signed in by hand.
 2. Pass the results to the user as findings. The gap list is part of the answer:
    name what could not be reached and why.
 3. After a finished search, tell the user the corpus is saved and ask whether to

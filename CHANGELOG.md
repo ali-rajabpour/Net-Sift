@@ -6,7 +6,23 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Reddit search no longer goes through OpenCLI. Reddit now answers every JSON
+  endpoint with a 403 "blocked by network security" page, so the `reddit` source
+  reads the HTML search page in the managed browser instead, with votes, comments,
+  date, author, and subreddit taken from the page. It needs a session signed in by
+  hand in the managed profile (`net-sift login reddit`); a missing or stale session
+  is reported as a gap with that fix. `doctor --probe` and `verify` load one search
+  page and report `live`, `blocked`, or `needs-login`.
+
 ### Fixed
+
+- The headless browser sent a hardcoded Chrome 153 user agent, which drifted out of
+  step with the installed browser. The user agent is now read from the browser
+  itself, with the `HeadlessChrome` token replaced.
+- Calls to the managed browser's DevTools port on 127.0.0.1 no longer go through
+  `HTTP(S)_PROXY`.
 
 - `net-sift login` reported a site as logged in as soon as any auth cookie was
   present, so an expired session closed the window before you could sign in. It

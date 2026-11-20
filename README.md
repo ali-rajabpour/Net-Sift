@@ -142,7 +142,7 @@ ranked items, and the corpus path.
 ## Walled platforms
 
 Twitter/X, Reddit, Instagram, Facebook, Bilibili, Xiaohongshu, and Zhihu need
-OpenCLI and a managed browser profile. `net-sift install` handles this; see
+a managed browser profile; all but Reddit also need OpenCLI. `net-sift install` handles this; see
 [net_sift/guides/setup-opencli.md](net_sift/guides/setup-opencli.md) for the manual
 version:
 
@@ -158,6 +158,12 @@ Searches then run headless from the copied profile, with the browser closed; net
 kills the browser when the sweep ends. macOS only for now. Some platforms (for example
 Facebook) block automated navigation even when you are logged in; net-sift reports
 that honestly and moves on rather than looping.
+
+Reddit blocks its JSON endpoints for every client, so net-sift reads its HTML search
+page instead. It only works for a session signed in by hand: run `net-sift login
+reddit` once and sign in in the window that opens, even if your own browser is
+already signed in. When the session expires, searches report "reddit session
+blocked/expired"; run `net-sift login reddit` again.
 
 ## Optional features
 

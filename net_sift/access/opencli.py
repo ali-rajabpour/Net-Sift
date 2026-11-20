@@ -3,7 +3,8 @@
 OpenCLI drives the user's real logged-in Chrome via a browser-bridge extension and
 a local daemon, so login platforms are reached as the human, with no cookie
 copying or private-API reverse engineering. Built-in adapters cover Twitter/X,
-Reddit, Instagram, Facebook, Bilibili, Xiaohongshu, Zhihu, and more.
+Instagram, Facebook, Bilibili, Xiaohongshu, Zhihu, and more. Reddit is not one of
+them: it blocks its JSON endpoints, so access/reddit.py scrapes its HTML instead.
 
 net-sift shells to ``opencli <site> <command> -f json`` directly and normalizes the
 structured output into engine records, so the raw platform payload never reaches
@@ -34,21 +35,19 @@ from ..engine.core import UA, Record, parse_iso, rec
 
 OPENCLI_BIN = os.environ.get("NET_SIFT_OPENCLI_BIN", "opencli")
 
-# Login platforms we route through OpenCLI. Keyless platforms (hackernews, etc.)
-# stay in the engine even though OpenCLI also offers them.
 # Login platforms we route through OpenCLI, each mapped to its search command (all
 # verified to expose `search` in the OpenCLI adapter catalog). OpenCLI uses the id
 # `twitter` for X. Keyless platforms (hackernews, etc.) stay in the engine.
 WALLED_SEARCH = {
     "twitter": "search",
-    "reddit": "search",
     "instagram": "search",
     "facebook": "search",
     "bilibili": "search",
     "xiaohongshu": "search",
     "zhihu": "search",
 }
-WALLED_SITES = tuple(WALLED_SEARCH)
+#: Every login platform. Reddit is scraped from its HTML search page (access/reddit.py).
+WALLED_SITES = (*WALLED_SEARCH, "reddit")
 
 # Open sources that need no account, reached through OpenCLI:
 # name -> (site, command, max --limit, needs the browser). Every entry was run live

@@ -99,7 +99,9 @@ def main(argv: list | None = None) -> int:
     sub.add_parser("serve", help="run the MCP server (stdio)").set_defaults(func=_cmd_serve)
 
     d = sub.add_parser("doctor", help="what can net-sift reach right now")
-    d.add_argument("--probe", action="store_true", help="also live-check keyless sources")
+    d.add_argument(
+        "--probe", action="store_true", help="also live-check keyless sources and Reddit"
+    )
     d.set_defaults(func=_cmd_doctor)
 
     s = sub.add_parser("status", help="connectivity snapshot")

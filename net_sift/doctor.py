@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 from . import config
 from . import darkweb as darkweb_mod
 from . import instagram_recon as ig_mod
-from .access import browsers, opencli, profile
+from .access import browser, browsers, opencli, profile, reddit
 from .engine import sources
 
 
@@ -33,7 +33,8 @@ def _managed() -> dict:
 
 
 def report(probe: bool = False) -> dict:
-    """Structured health report. probe=True live-checks keyless sources (slower)."""
+    """Structured health report. probe=True live-checks keyless sources and loads one
+    Reddit search page in the managed browser (slower)."""
     m = _managed()
     sites = profile.logged_in(m["profile"]) if m["profile_ready"] else {}
     data = {
@@ -62,6 +63,7 @@ def report(probe: bool = False) -> dict:
     }
     if probe:
         data["keyless_reachable"] = _probe_keyless()
+        data["reddit"] = _probe_reddit(m)
     data["guidance"] = _guidance(m, sites)
     return data
 
@@ -114,6 +116,21 @@ def _probe_keyless() -> dict:
     return {name: out.get(name, slow) for name in sources.SOURCES}
 
 
+def _probe_reddit(managed: dict) -> str:
+    """live, blocked, or needs-login, from one search page in the managed browser."""
+    if not (managed["profile_ready"] and managed["browser_present"]):
+        return "needs-login (no managed profile; run `net-sift install`)"
+    exe = browsers.detect()[managed["browser"]]["executable"]
+    try:
+        with browser.managed_browser(exe, managed["profile"]) as endpoint:
+            st = reddit.status(endpoint, managed["profile"])
+    except Exception as e:
+        return f"error: {type(e).__name__}: {e}"
+    if st in ("needs-login", "blocked"):
+        st += " (run `net-sift login reddit` and sign in by hand)"
+    return st
+
+
 def _guidance(managed: dict, sites: dict) -> str:
     if not opencli.binary():
         return (
@@ -161,6 +178,8 @@ def render(probe: bool = False) -> str:
         lines.append("keyless reachability:")
         for k, v in d["keyless_reachable"].items():
             lines.append(f"  {k:14} {v}")
+    if "reddit" in d:
+        lines.append(f"reddit   : {d['reddit']}")
     lines.append("")
     lines.append(d["guidance"])
     return "\n".join(lines)

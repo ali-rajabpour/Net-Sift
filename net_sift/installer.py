@@ -22,7 +22,7 @@ import urllib.request
 from pathlib import Path
 
 from . import config
-from .access import browser, browsers, opencli, profile
+from .access import browser, browsers, opencli, profile, reddit
 
 MCP_ENTRY = {"command": "net-sift", "args": ["serve"]}
 OPENCODE_ENTRY = {"type": "local", "command": ["net-sift", "serve"], "enabled": True}
@@ -330,11 +330,22 @@ def verify_sources(home: Path, ui: _UI) -> dict:
     ]
     targets += [
         (s, opencli.make_source(s, "search"), "新闻" if s in _ZH_SITES else "news")
-        for s in opencli.WALLED_SITES
+        for s in opencli.WALLED_SEARCH
     ]
     with browser.managed_browser(exe, pdir) as endpoint:
         opencli.set_endpoint(endpoint)
         try:
+            st = reddit.status(endpoint, pdir)
+            if st.startswith("live"):
+                results["reddit"] = ("ok", st)
+                ui.ok(f"reddit: {st}")
+            elif st in ("needs-login", "blocked"):
+                # A stale session is blocked like a missing one; both need a sign-in by hand.
+                results["reddit"] = ("fail", "login")
+                ui.warn(f"reddit: {st}; run `net-sift login reddit` and sign in by hand")
+            else:
+                results["reddit"] = ("fail", "error")
+                ui.warn(f"reddit: {st}")
             for name, fn, q in targets:
                 try:
                     recs, _ = fn(q, None, None, 3)
@@ -398,8 +409,9 @@ def _managed(home: Path) -> tuple[str, str] | None:
 def _live(site: str) -> str | None:
     """Run the site's search once through the current endpoint. None when it works,
     else the classified failure reason."""
+    fn = reddit.search if site == "reddit" else opencli.make_source(site, "search")
     try:
-        opencli.make_source(site, "search")("新闻" if site in _ZH_SITES else "news", None, None, 3)
+        fn("新闻" if site in _ZH_SITES else "news", None, None, 3)
         return None
     except Exception as e:
         return _classify(str(e))

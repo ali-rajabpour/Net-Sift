@@ -12,7 +12,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 from . import config, sessions
-from .access import browser, browsers, opencli, profile
+from .access import browser, browsers, opencli, profile, reddit
 from .engine import core, sources
 
 
@@ -42,6 +42,7 @@ def all_sources(with_browser: bool = False) -> dict[str, core.Source]:
     merged: dict[str, core.Source] = dict(sources.SOURCES)
     if with_browser:
         merged.update(opencli.walled_sources(connected=True))
+        merged["reddit"] = reddit.search
         merged.update(opencli.open_sources(connected=True))
     # Keyless `brave` comes from the browser (OPEN_SEARCH). The Brave Search API is a
     # separate keyed path, `brave_api`, for when there is no managed profile.

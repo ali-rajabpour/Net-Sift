@@ -38,7 +38,7 @@ def test_items_envelopes():
 
 
 def test_walled_meta_complete():
-    assert set(opencli.WALLED_META) == set(opencli.WALLED_SEARCH)
+    assert set(opencli.WALLED_META) == set(opencli.WALLED_SITES)
 
 
 class _Proc:
